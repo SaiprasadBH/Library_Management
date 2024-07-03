@@ -15,6 +15,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@faker-js/faker": "^8.4.1",
     "@types/node": "^20.14.9",
     "prettier": "^3.3.2",
     "ts-node": "^10.9.2",

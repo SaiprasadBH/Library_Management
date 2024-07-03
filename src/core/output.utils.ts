@@ -1,11 +1,15 @@
 import chalk from "chalk";
 
 export function printTitle() {
-  console.log(chalk.bgGreenBright("\n---Library Management---"));
+  console.log(chalk.bgGreenBright("\n---Library Management"));
 }
 
 export function printSubTitle(subTitle: string) {
-  console.log(chalk.bgCyan(`---${subTitle}---\n`));
+  console.log(chalk.bgCyan(`\n--${subTitle}`));
+}
+
+export function printChoice(choice: string) {
+  console.log(chalk.bgBlueBright(`\n-${choice}`));
 }
 
 export function printQuestion(question: string) {
@@ -17,11 +21,11 @@ export function printError(msg: string) {
 }
 
 export function printHint(msg: string) {
-  console.log(`${chalk.grey(msg)}`);
+  console.log(`\n${chalk.grey(msg)}\n`);
 }
 
 export function printResult(msg: string) {
-  console.log(`\n${chalk.bgGreen(msg)}\n`);
+  console.log(`\n${chalk.bgGreen(msg)}`);
 }
 
 // printQuestion("gsdgngfn");

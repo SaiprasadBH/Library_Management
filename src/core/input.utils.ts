@@ -1,5 +1,5 @@
 import readline from "node:readline";
-import { printQuestion } from "./output.utils";
+import { printQuestion, printResult } from "./output.utils";
 import chalk from "chalk";
 
 const rl = readline.createInterface({
@@ -10,12 +10,14 @@ const rl = readline.createInterface({
 export const readLine = (question: string): Promise<string> => {
   return new Promise((resolve) =>
     rl.question(chalk.green(question), (input) => {
+      // if(input === )
       resolve(input);
     })
   );
 };
 
 export const readChar = (question: string): Promise<string> => {
+  printResult("    Menu    ");
   printQuestion(question);
   return new Promise((resolve) => {
     process.stdin.setRawMode(true);

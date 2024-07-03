@@ -3,6 +3,7 @@ import { clearScreen, readChar, readLine } from "../core/input.utils";
 import { BookRepository } from "./book.repository";
 import { IBook, IBookBase } from "../models/book.model";
 import {
+  printChoice,
   printError,
   printHint,
   printResult,
@@ -17,8 +18,7 @@ const menu = `
     2. Edit a Book
     3. Search for a Book
     4. Delete a Book
-    5. Previous Menu`;
-
+    5. <Previous Menu>\n`;
 export class BookInteractor implements IInteractor {
   private repo: BookRepository;
 
@@ -32,22 +32,23 @@ export class BookInteractor implements IInteractor {
       printTitle();
       printSubTitle("Book Management");
       const op = await readChar(menu);
-
+      printTitle();
+      printSubTitle("Book Management");
       switch (op.toLowerCase()) {
         case "1":
-          printSubTitle("Add Book");
+          printChoice("Add Book");
           await addBook(this.repo);
           break;
         case "2":
-          printSubTitle("Edit Book");
+          printChoice("Edit Book");
           await editBook(this.repo);
           break;
         case "3":
-          printSubTitle("Search Book");
+          printChoice("Search Book");
           await searchForBook(this.repo);
           break;
         case "4":
-          printSubTitle("Delete Book");
+          printChoice("Delete Book");
           await deleteBook(this.repo);
           break;
         case "5":
@@ -132,6 +133,7 @@ async function getBookInput(existingBook?: IBookBase): Promise<IBookBase> {
 }
 
 async function addBook(repo: BookRepository) {
+  console.log("");
   const newBook: IBookBase = await getBookInput();
   const createdBook: IBook = await repo.create(newBook);
   printResult("Added the book successfully");
@@ -141,14 +143,16 @@ async function addBook(repo: BookRepository) {
 }
 
 async function editBook(repo: BookRepository) {
-  printHint('Press "Enter" if you don\'t want to change the current property.');
   const bookId = await checkInt(
-    await readLine("Enter the Id of the book to edit: ")
+    await readLine("\nEnter the Id of the book to edit: ")
   );
   const existingBook = await repo.getById(bookId);
   if (!existingBook) {
     printError("Book not found");
   } else {
+    printHint(
+      'Press "Enter" if you don\'t want to change the current property.'
+    );
     const updatedData = await getBookInput(existingBook);
     const updatedBook = await repo.update(existingBook.id, updatedData);
     printResult("Book updated successfully");
@@ -159,9 +163,9 @@ async function editBook(repo: BookRepository) {
 }
 
 async function searchForBook(repo: BookRepository) {
-  const search = await getNonEmptyInput("Search for title or ISBNo.\n");
+  const search = await getNonEmptyInput("\nSearch for title or ISBNo.\n");
   printHint('Press "Enter" to set default offset to 0');
-  const defaultOffset: number = 0;
+  const defaultOffset: string | number = "-";
   const defaultLimit: number = 5;
   const offset = await checkInt(
     await setUserInputOrDefault("Enter offset: ", defaultOffset)
