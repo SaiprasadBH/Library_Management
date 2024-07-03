@@ -2,65 +2,76 @@ import { IPageRequest, IPagedResponse } from "../core/pagination";
 import { IRepository } from "../core/repository";
 import { IBook } from "../models/book.model";
 import { bookSchema, IBookBase } from "../models/book.schema";
+import { Database } from "../database/db";
 
 export class BookRepository implements IRepository<IBookBase, IBook> {
-  books: IBook[] = [];
-  create(data: IBookBase): IBook {
+  private tableName: string = "books";
+
+  constructor(private readonly db: Database) {}
+
+  async create(data: IBookBase): Promise<IBook> {
     // Validate data
     const validatedData = bookSchema.parse(data);
 
+    const books = this.db.table<IBook>(this.tableName);
     const book: IBook = {
       ...validatedData,
-      id: this.books.length + 1,
+      id: books.length + 1,
       availableNumOfCopies: validatedData.totalNumOfCopies,
     };
-    this.books.push(book);
+    books.push(book);
+    await this.db.save();
     return book;
   }
 
-  update(id: number, data: IBookBase): IBook | null {
-    const index = this.books.findIndex((b) => b.id === id);
+  async update(id: number, data: IBookBase): Promise<IBook | null> {
+    const books = this.db.table<IBook>(this.tableName);
+    const index = books.findIndex((b) => b.id === id);
     if (index !== -1) {
       // Validate data
       const validatedData = bookSchema.parse(data);
 
       const updatedBook: IBook = {
-        ...this.books[index],
+        ...books[index],
         ...validatedData,
         availableNumOfCopies:
           validatedData.totalNumOfCopies -
-          (this.books[index].totalNumOfCopies -
-            this.books[index].availableNumOfCopies),
+          (books[index].totalNumOfCopies - books[index].availableNumOfCopies),
       };
-      this.books[index] = updatedBook;
+      books[index] = updatedBook;
+      await this.db.save();
       return updatedBook;
     }
     return null;
   }
 
-  delete(id: number): IBook | null {
-    const index = this.books.findIndex((b) => b.id === id);
+  async delete(id: number): Promise<IBook | null> {
+    const books = this.db.table<IBook>(this.tableName);
+    const index = books.findIndex((b) => b.id === id);
     if (index !== -1) {
-      const [deletedBook] = this.books.splice(index, 1);
+      const [deletedBook] = books.splice(index, 1);
+      await this.db.save();
       return deletedBook;
     }
     return null;
   }
 
-  getById(id: number): IBook | null {
-    const book = this.books.find((b) => b.id === id);
+  async getById(id: number): Promise<IBook | null> {
+    const books = this.db.table<IBook>(this.tableName);
+    const book = books.find((b) => b.id === id);
     return book || null;
   }
 
-  list(params: IPageRequest): IPagedResponse<IBook> {
+  async list(params: IPageRequest): Promise<IPagedResponse<IBook>> {
+    const books = this.db.table<IBook>(this.tableName);
     const search = params.search?.toLowerCase();
     const filteredBooks = search
-      ? this.books.filter(
+      ? books.filter(
           (b) =>
             b.title.toLowerCase().includes(search) ||
             b.isbNo.toLowerCase().includes(search)
         )
-      : this.books;
+      : books;
     return {
       items: filteredBooks.slice(params.offset, params.limit + params.offset),
       pagination: {
@@ -70,7 +81,10 @@ export class BookRepository implements IRepository<IBookBase, IBook> {
       },
     };
   }
-  reset() {
-    this.books.length = 0;
+
+  async reset() {
+    const books = this.db.table<IBook>(this.tableName);
+    books.length = 0;
+    await this.db.save();
   }
 }

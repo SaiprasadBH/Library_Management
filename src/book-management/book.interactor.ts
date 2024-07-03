@@ -10,6 +10,7 @@ import {
   printTitle,
 } from "../core/output.utils";
 import { IPageRequest } from "../core/pagination";
+import { Database } from "../database/db";
 
 const menu = `
     1. Add a Book
@@ -17,8 +18,14 @@ const menu = `
     3. Search for a Book
     4. Delete a Book
     5. Previous Menu`;
+
 export class BookInteractor implements IInteractor {
-  private repo = new BookRepository();
+  private repo: BookRepository;
+
+  constructor(db: Database) {
+    this.repo = new BookRepository(db);
+  }
+
   async showMenu(): Promise<void> {
     let loop = true;
     while (loop) {
@@ -123,9 +130,10 @@ async function getBookInput(existingBook?: IBookBase): Promise<IBookBase> {
     totalNumOfCopies: totalNumOfCopies,
   };
 }
+
 async function addBook(repo: BookRepository) {
   const newBook: IBookBase = await getBookInput();
-  const createdBook: IBook = repo.create(newBook);
+  const createdBook: IBook = await repo.create(newBook);
   printResult("Added the book successfully");
   console.table(createdBook);
   await readLine("Press Enter to continue");
@@ -137,12 +145,12 @@ async function editBook(repo: BookRepository) {
   const bookId = await checkInt(
     await readLine("Enter the Id of the book to edit: ")
   );
-  const existingBook = repo.getById(bookId);
+  const existingBook = await repo.getById(bookId);
   if (!existingBook) {
     printError("Book not found");
   } else {
     const updatedData = await getBookInput(existingBook);
-    const updatedBook = repo.update(existingBook.id, updatedData);
+    const updatedBook = await repo.update(existingBook.id, updatedData);
     printResult("Book updated successfully");
     console.table(updatedBook);
   }
@@ -163,7 +171,7 @@ async function searchForBook(repo: BookRepository) {
     await setUserInputOrDefault("Enter limit: ", defaultLimit)
   );
   const pageRequest: IPageRequest = { search, offset, limit };
-  const searchResult = repo.list(pageRequest);
+  const searchResult = await repo.list(pageRequest);
   if (searchResult.items.length === 0) {
     printError("No match found");
   } else {
@@ -182,13 +190,13 @@ async function deleteBook(repo: BookRepository) {
   const bookId = await checkInt(
     await readLine("Enter the Id of the book to delete: ")
   );
-  const deletedBook = repo.delete(bookId);
+  const deletedBook = await repo.delete(bookId);
   if (!deletedBook) printError("Book not found");
   else {
     printResult(
       `The book ${deletedBook.title} with Id ${bookId} deleted successfully`
     );
-    console.table(deleteBook);
+    console.table(deletedBook);
   }
   await readLine("Press Enter to continue");
   return;

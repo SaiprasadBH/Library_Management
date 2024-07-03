@@ -1,16 +1,18 @@
 import { describe, test, expect, beforeEach } from "vitest";
 import { BookRepository } from "./book.repository";
-import { IBookBase, bookSchema } from "../models/book.schema";
+import { IBookBase } from "../models/book.schema";
+import { Database, JsonAdapter } from "../database/db";
 
 let bookRepo: BookRepository;
+const db = new Database("database-test-files/json", JsonAdapter);
 
-beforeEach(() => {
-  bookRepo = new BookRepository();
-  bookRepo.books.length = 0;
+beforeEach(async () => {
+  bookRepo = new BookRepository(db);
+  await bookRepo.reset();
 });
 
 describe("BookRepository", () => {
-  test("should create a book", () => {
+  test("should create a book", async () => {
     const bookData: IBookBase = {
       title: "Test Book",
       author: "Test Author",
@@ -21,7 +23,7 @@ describe("BookRepository", () => {
       totalNumOfCopies: 10,
     };
 
-    const createdBook = bookRepo.create(bookData);
+    const createdBook = await bookRepo.create(bookData);
 
     expect(createdBook).toEqual({
       ...bookData,
@@ -30,7 +32,7 @@ describe("BookRepository", () => {
     });
   });
 
-  test("should update a book", () => {
+  test("should update a book", async () => {
     const bookData: IBookBase = {
       title: "Test Book",
       author: "Test Author",
@@ -41,14 +43,14 @@ describe("BookRepository", () => {
       totalNumOfCopies: 10,
     };
 
-    const createdBook = bookRepo.create(bookData);
+    const createdBook = await bookRepo.create(bookData);
     const updatedData: IBookBase = {
       ...bookData,
       title: "Updated Test Book",
       totalNumOfCopies: 15,
     };
 
-    const updatedBook = bookRepo.update(createdBook.id, updatedData);
+    const updatedBook = await bookRepo.update(createdBook.id, updatedData);
 
     expect(updatedBook).toEqual({
       ...updatedData,
@@ -58,7 +60,7 @@ describe("BookRepository", () => {
     });
   });
 
-  test("should delete a book", () => {
+  test("should delete a book", async () => {
     const bookData: IBookBase = {
       title: "Test Book",
       author: "Test Author",
@@ -69,14 +71,14 @@ describe("BookRepository", () => {
       totalNumOfCopies: 10,
     };
 
-    const createdBook = bookRepo.create(bookData);
-    const deletedBook = bookRepo.delete(createdBook.id);
+    const createdBook = await bookRepo.create(bookData);
+    const deletedBook = await bookRepo.delete(createdBook.id);
 
     expect(deletedBook).toEqual(createdBook);
-    expect(bookRepo.getById(createdBook.id)).toBeNull();
+    expect(await bookRepo.getById(createdBook.id)).toBeNull();
   });
 
-  test("should get a book by id", () => {
+  test("should get a book by id", async () => {
     const bookData: IBookBase = {
       title: "Test Book",
       author: "Test Author",
@@ -87,13 +89,13 @@ describe("BookRepository", () => {
       totalNumOfCopies: 10,
     };
 
-    const createdBook = bookRepo.create(bookData);
-    const fetchedBook = bookRepo.getById(createdBook.id);
+    const createdBook = await bookRepo.create(bookData);
+    const fetchedBook = await bookRepo.getById(createdBook.id);
 
     expect(fetchedBook).toEqual(createdBook);
   });
 
-  test("should list books with pagination", () => {
+  test("should list books with pagination", async () => {
     const bookData1: IBookBase = {
       title: "Test Book 1",
       author: "Test Author 1",
@@ -114,10 +116,10 @@ describe("BookRepository", () => {
       totalNumOfCopies: 20,
     };
 
-    bookRepo.create(bookData1);
-    bookRepo.create(bookData2);
+    await bookRepo.create(bookData1);
+    await bookRepo.create(bookData2);
 
-    const paginatedBooks = bookRepo.list({ offset: 0, limit: 1 });
+    const paginatedBooks = await bookRepo.list({ offset: 0, limit: 1 });
 
     expect(paginatedBooks.items.length).toBe(1);
     expect(paginatedBooks.pagination.total).toBe(2);
