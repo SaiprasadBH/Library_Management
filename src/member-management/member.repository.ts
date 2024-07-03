@@ -1,6 +1,10 @@
 import { IPageRequest, IPagedResponse } from "../core/pagination";
 import { IRepository } from "../core/repository";
-import { IMember, IMemberBase, MemberBaseSchema } from "../models/memberSchema";
+import {
+  IMember,
+  IMemberBase,
+  MemberBaseSchema,
+} from "../models/member.schema";
 
 export class MemberRepository implements IRepository<IMemberBase, IMember> {
   members: IMember[] = [];

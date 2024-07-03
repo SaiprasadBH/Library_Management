@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach } from "vitest";
-import { MemberRepository } from "./member-repository";
-import { IMemberBase, IMember } from "../models/memberSchema";
+import { MemberRepository } from "./member.repository";
+import { IMemberBase, IMember } from "../models/member.schema";
 
 describe("MemberRepository", () => {
   let repository: MemberRepository;

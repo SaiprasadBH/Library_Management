@@ -1,14 +1,14 @@
 import { IInteractor } from "../core/interactor";
-import { readChar, readLine } from "../core/input.utils";
-import { BookRepository } from "./bookrepository";
-import { IBook, IBookBase } from "../model/bookmodel";
+import { clearScreen, readChar, readLine } from "../core/input.utils";
+import { BookRepository } from "./book.repository";
+import { IBook, IBookBase } from "../models/book.model";
 import {
   printError,
   printHint,
   printResult,
   printSubTitle,
   printTitle,
-} from "../src/core/output.utils";
+} from "../core/output.utils";
 import { IPageRequest } from "../core/pagination";
 
 const menu = `
@@ -20,23 +20,27 @@ const menu = `
 export class BookInteractor implements IInteractor {
   private repo = new BookRepository();
   async showMenu(): Promise<void> {
-    printTitle();
-    printSubTitle("Book Management");
     let loop = true;
     while (loop) {
+      printTitle();
+      printSubTitle("Book Management");
       const op = await readChar(menu);
 
       switch (op.toLowerCase()) {
         case "1":
+          printSubTitle("Add Book");
           await addBook(this.repo);
           break;
         case "2":
+          printSubTitle("Edit Book");
           await editBook(this.repo);
           break;
         case "3":
+          printSubTitle("Search Book");
           await searchForBook(this.repo);
           break;
         case "4":
+          printSubTitle("Delete Book");
           await deleteBook(this.repo);
           break;
         case "5":
@@ -44,7 +48,9 @@ export class BookInteractor implements IInteractor {
           break;
         default:
           printError("Invalid Input");
+          break;
       }
+      clearScreen();
     }
   }
 }
@@ -147,11 +153,15 @@ async function editBook(repo: BookRepository) {
 async function searchForBook(repo: BookRepository) {
   const search = await getNonEmptyInput("Search for title or ISBNo.\n");
   printHint('Press "Enter" to set default offset to 0');
+  const defaultOffset: number = 0;
+  const defaultLimit: number = 5;
   const offset = await checkInt(
-    await setUserInputOrDefault("Enter offset: ", 0)
+    await setUserInputOrDefault("Enter offset: ", defaultOffset)
   );
   printHint('Press "Enter" to set default limit to 5');
-  const limit = await checkInt(await setUserInputOrDefault("Enter limit: ", 5));
+  const limit = await checkInt(
+    await setUserInputOrDefault("Enter limit: ", defaultLimit)
+  );
   const pageRequest: IPageRequest = { search, offset, limit };
   const searchResult = repo.list(pageRequest);
   if (searchResult.items.length === 0) {

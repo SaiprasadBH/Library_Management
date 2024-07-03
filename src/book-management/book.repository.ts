@@ -1,7 +1,7 @@
 import { IPageRequest, IPagedResponse } from "../core/pagination";
 import { IRepository } from "../core/repository";
-import { IBook } from "../model/bookmodel";
-import { bookSchema, IBookBase } from "../model/bookSchema";
+import { IBook } from "../models/book.model";
+import { bookSchema, IBookBase } from "../models/book.schema";
 
 export class BookRepository implements IRepository<IBookBase, IBook> {
   books: IBook[] = [];

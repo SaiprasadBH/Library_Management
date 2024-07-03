@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach } from "vitest";
-import { BookRepository } from "./bookrepository";
-import { IBookBase, bookSchema } from "../model/bookSchema";
+import { BookRepository } from "./book.repository";
+import { IBookBase, bookSchema } from "../models/book.schema";
 
 let bookRepo: BookRepository;
 

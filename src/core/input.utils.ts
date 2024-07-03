@@ -1,4 +1,5 @@
 import readline from "node:readline";
+import { printQuestion } from "./output.utils";
 import chalk from "chalk";
 
 const rl = readline.createInterface({
@@ -15,14 +16,19 @@ export const readLine = (question: string): Promise<string> => {
 };
 
 export const readChar = (question: string): Promise<string> => {
-  console.log(question);
+  printQuestion(question);
   return new Promise((resolve) => {
     process.stdin.setRawMode(true);
     process.stdin.setEncoding("utf-8");
     process.stdin.once("data", (buff) => {
       const char = buff.toString("utf-8");
+      clearScreen();
       rl.write(null, { ctrl: true, name: "u" });
       resolve(char);
     });
   });
+};
+
+export const clearScreen = () => {
+  process.stdout.write("\x1Bc");
 };
