@@ -11,14 +11,16 @@ import {
   printTitle,
 } from "../core/output.utils";
 import { IPageRequest } from "../core/pagination";
+import { Menu } from "../core/menu";
 import { Database } from "../database/db";
 
-const menu = `
-    1. Add a Book
-    2. Edit a Book
-    3. Search for a Book
-    4. Delete a Book
-    5. <Previous Menu>\n`;
+const menu = new Menu([
+  { key: "1", label: "Add a Book" },
+  { key: "2", label: "Edit a Book" },
+  { key: "3", label: "Search for a Book" },
+  { key: "4", label: "Delete a Book" },
+  { key: "5", label: "Previous Menu" },
+]);
 export class BookInteractor implements IInteractor {
   private repo: BookRepository;
 
@@ -31,24 +33,20 @@ export class BookInteractor implements IInteractor {
     while (loop) {
       printTitle();
       printSubTitle("Book Management");
-      const op = await readChar(menu);
-      printTitle();
-      printSubTitle("Book Management");
+      const op = await readChar(menu.serialize());
+      const menuItem = menu.getItem(op);
+      printSubTitle(`${menuItem?.label}`);
       switch (op.toLowerCase()) {
         case "1":
-          printChoice("Add Book");
           await addBook(this.repo);
           break;
         case "2":
-          printChoice("Edit Book");
           await editBook(this.repo);
           break;
         case "3":
-          printChoice("Search Book");
           await searchForBook(this.repo);
           break;
         case "4":
-          printChoice("Delete Book");
           await deleteBook(this.repo);
           break;
         case "5":

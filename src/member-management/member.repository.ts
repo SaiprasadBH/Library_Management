@@ -5,58 +5,70 @@ import {
   IMemberBase,
   MemberBaseSchema,
 } from "../models/member.schema";
+import { Database } from "../database/db";
 
 export class MemberRepository implements IRepository<IMemberBase, IMember> {
-  members: IMember[] = [];
-  create(data: IMemberBase): IMember {
-    const parsedData = MemberBaseSchema.parse(data);
+  private tableName: string = "members";
+
+  constructor(private readonly db: Database) {}
+
+  async create(data: IMemberBase): Promise<IMember> {
+    const validatedData = MemberBaseSchema.parse(data);
+    const members = this.db.table<IMember>(this.tableName);
 
     const newMember: IMember = {
-      ...parsedData,
-      id: this.members.length + 1,
+      ...validatedData,
+      id: members.length + 1,
     };
-    this.members.push(newMember);
+    members.push(newMember);
+    await this.db.save();
     return newMember;
   }
 
-  update(id: number, data: IMemberBase): IMember | null {
-    const index = this.members.findIndex((member) => member.id === id);
+  async update(id: number, data: IMemberBase): Promise<IMember | null> {
+    const members = this.db.table<IMember>(this.tableName);
+    const index = members.findIndex((member) => member.id === id);
     if (index !== -1) {
       const parsedData = MemberBaseSchema.parse(data);
 
       const updatedMember = {
-        ...this.members[index],
+        ...members[index],
         ...parsedData,
       };
-      this.members[index] = updatedMember;
+      members[index] = updatedMember;
+      await this.db.save();
       return updatedMember;
     }
     return null;
   }
 
-  delete(id: number): IMember | null {
-    const index = this.members.findIndex((member) => member.id === id);
+  async delete(id: number): Promise<IMember | null> {
+    const members = this.db.table<IMember>(this.tableName);
+    const index = members.findIndex((member) => member.id === id);
     if (index !== -1) {
-      const [deletedMember] = this.members.splice(index, 1);
+      const [deletedMember] = members.splice(index, 1);
+      await this.db.save();
       return deletedMember;
     }
     return null;
   }
 
-  getById(id: number): IMember | null {
-    const memberFound = this.members.find((member) => member.id === id);
+  async getById(id: number): Promise<IMember | null> {
+    const members = this.db.table<IMember>(this.tableName);
+    const memberFound = members.find((member) => member.id === id);
     return memberFound || null;
   }
 
-  list(params: IPageRequest): IPagedResponse<IMember> {
+  async list(params: IPageRequest): Promise<IPagedResponse<IMember>> {
+    const members = this.db.table<IMember>(this.tableName);
     const search = params.search?.toLowerCase();
     const filteredMembers = search
-      ? this.members.filter(
+      ? members.filter(
           (b) =>
             b.name.toLowerCase().includes(search) ||
             b.phoneNumber.includes(search)
         )
-      : this.members;
+      : members;
     return {
       items: filteredMembers.slice(params.offset, params.limit + params.offset),
       pagination: {

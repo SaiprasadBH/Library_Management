@@ -11,38 +11,42 @@ import {
   printTitle,
 } from "../core/output.utils";
 import { IPageRequest } from "../core/pagination";
+import { Menu } from "../core/menu";
+import { Database } from "../database/db";
 
-const menu = `
-    1. Add a Member
-    2. Edit a Member
-    3. Search for a Member
-    4. Delete a Member
-    5. <Previous Menu>\n`;
+const menu = new Menu([
+  { key: "1", label: "Add a Member" },
+  { key: "2", label: "Edit a Member" },
+  { key: "3", label: "Search for a Member" },
+  { key: "4", label: "Delete a Member" },
+  { key: "5", label: "<Previous Menu>\n" },
+]);
 export class MemberInteractor implements IInteractor {
-  private repo = new MemberRepository();
+  private repo: MemberRepository;
+
+  constructor(db: Database) {
+    this.repo = new MemberRepository(db);
+  }
+
   async showMenu(): Promise<void> {
     let loop = true;
     while (loop) {
       printTitle();
       printSubTitle("Member Management");
-      const op = await readChar(menu);
-      printTitle();
-      printSubTitle("Member Management");
+      const op = await readChar(menu.serialize());
+      const menuItem = menu.getItem(op);
+      printChoice(`${menuItem?.label}`);
       switch (op.toLowerCase()) {
         case "1":
-          printChoice("Add Member");
           await addMember(this.repo);
           break;
         case "2":
-          printChoice("Edit Member");
           await editMember(this.repo);
           break;
         case "3":
-          printChoice("Search Member");
           await searchForMember(this.repo);
           break;
         case "4":
-          printChoice("Delete Member");
           await deleteMember(this.repo);
           break;
         case "5":
@@ -113,7 +117,7 @@ async function addMember(repo: MemberRepository) {
   console.log("");
   try {
     const newMember: IMemberBase = await getMemberInput();
-    const createdMember: IMember = repo.create(newMember);
+    const createdMember: IMember = await repo.create(newMember);
     printResult("Added the Member successfully");
     console.table(createdMember);
   } catch (error: unknown) {
@@ -127,7 +131,7 @@ async function editMember(repo: MemberRepository) {
   const memberId = await checkInt(
     await readLine("\nEnter the Id of the Member to edit: ")
   );
-  const existingMember = repo.getById(memberId);
+  const existingMember = await repo.getById(memberId);
   if (!existingMember) {
     printError("Member not found");
   } else {
@@ -135,7 +139,7 @@ async function editMember(repo: MemberRepository) {
       'Press "Enter" if you don\'t want to change the current property.'
     );
     const updatedData = await getMemberInput(existingMember);
-    const updatedMember = repo.update(existingMember.id, updatedData);
+    const updatedMember = await repo.update(existingMember.id, updatedData);
     printResult("Member updated successfully");
     console.table(updatedMember);
   }
@@ -156,7 +160,7 @@ async function searchForMember(repo: MemberRepository) {
     await setUserInputOrDefault("Enter limit: ", defaultLimit)
   );
   const pageRequest: IPageRequest = { search, offset, limit };
-  const searchResult = repo.list(pageRequest);
+  const searchResult = await repo.list(pageRequest);
   if (searchResult.items.length === 0) {
     printError("No match found");
   } else {
@@ -175,7 +179,7 @@ async function deleteMember(repo: MemberRepository) {
   const memberId = await checkInt(
     await readLine("Enter the Id of the Member to delete: ")
   );
-  const deletedMember = repo.delete(memberId);
+  const deletedMember = await repo.delete(memberId);
   if (!deletedMember) printError("Member not found");
   else {
     printResult(

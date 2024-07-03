@@ -11,5 +11,5 @@ export const MemberSchema = MemberBaseSchema.extend({
   id: z.number().int().min(1),
 });
 
-export type IMemberBase = z.infer<typeof MemberBaseSchema>;
-export type IMember = z.infer<typeof MemberSchema>;
+export type IMemberBase = z.input<typeof MemberBaseSchema>;
+export type IMember = z.input<typeof MemberSchema>;

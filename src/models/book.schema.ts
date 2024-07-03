@@ -16,4 +16,4 @@ export const bookSchema = z.object({
     .positive("Total number of copies must be a positive integer"),
 });
 
-export type IBookBase = z.infer<typeof bookSchema>;
+export type IBookBase = z.input<typeof bookSchema>;
