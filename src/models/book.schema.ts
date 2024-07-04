@@ -16,4 +16,9 @@ export const bookSchema = z.object({
     .positive("Total number of copies must be a positive integer"),
 });
 
+export const BookSchema = bookSchema.extend({
+  id: z.number().int().min(1),
+});
+
 export type IBookBase = z.input<typeof bookSchema>;
+export type IBook = z.input<typeof BookSchema>;

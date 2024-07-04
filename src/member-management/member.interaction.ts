@@ -1,7 +1,6 @@
 import { IInteractor } from "../core/interactor";
 import { clearScreen, readChar, readLine } from "../core/input.utils";
 import { MemberRepository } from "./member.repository";
-import { IMember, IMemberBase } from "../models/member.model";
 import {
   printChoice,
   printError,
@@ -13,6 +12,8 @@ import {
 import { IPageRequest } from "../core/pagination";
 import { Menu } from "../core/menu";
 import { Database } from "../database/db";
+import { IMember, IMemberBase, MemberSchema } from "../models/member.schema";
+import { ZodNumber, z } from "zod";
 
 const menu = new Menu([
   { key: "1", label: "Add a Member" },
@@ -87,22 +88,51 @@ const setUserInputOrDefault = async <_, T>(
     : (await readLine(`${question} (${existingData ?? ""}):`)) || existingData;
 };
 
+async function validateInput<T>(
+  question: string,
+  schema: z.Schema<T>,
+  existingValue?: T
+): Promise<T> {
+  if (existingValue) {
+    const newInput =
+      (await readLine(`${question} (${existingValue ?? ""}):`)) ||
+      existingValue;
+    return schema.parse(
+      schema instanceof ZodNumber ? Number(newInput) : newInput
+    );
+  }
+  const input = await readLine(question);
+  try {
+    return schema.parse(schema instanceof ZodNumber ? Number(input) : input);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      printError(`Invalid input: ${error.errors[0].message}`);
+    }
+    return validateInput(question, schema, existingValue);
+  }
+}
+
 async function getMemberInput(
   existingMember?: IMemberBase
 ): Promise<IMemberBase> {
-  const name = await setUserInputOrDefault(
+  const name = await validateInput<string>(
     "Enter name: ",
+    MemberSchema.shape.name,
     existingMember?.name
   );
-  const age = await checkInt(
-    await setUserInputOrDefault("Enter age: ", existingMember?.age)
+  const age = await validateInput<number>(
+    "Enter age: ",
+    MemberSchema.shape.age,
+    existingMember?.age
   );
-  const address = await setUserInputOrDefault(
+  const address = await validateInput<string>(
     "Enter address: ",
+    MemberSchema.shape.address,
     existingMember?.address
   );
-  const phoneNumber = await setUserInputOrDefault(
+  const phoneNumber = await validateInput<string>(
     "Enter phoneNumber: ",
+    MemberSchema.shape.phoneNumber,
     existingMember?.phoneNumber
   );
 
@@ -118,8 +148,10 @@ async function addMember(repo: MemberRepository) {
   try {
     const newMember: IMemberBase = await getMemberInput();
     const createdMember: IMember = await repo.create(newMember);
-    printResult("Added the Member successfully");
-    console.table(createdMember);
+    if (createdMember) {
+      printResult("Added the Member successfully");
+      console.table(createdMember);
+    }
   } catch (error: unknown) {
     if (error instanceof Error) console.log(error.message);
   }
@@ -128,8 +160,9 @@ async function addMember(repo: MemberRepository) {
 }
 
 async function editMember(repo: MemberRepository) {
-  const memberId = await checkInt(
-    await readLine("\nEnter the Id of the Member to edit: ")
+  const memberId = await validateInput<number>(
+    "\nEnter the Id of the Member to edit: ",
+    MemberSchema.shape.id
   );
   const existingMember = await repo.getById(memberId);
   if (!existingMember) {
@@ -176,9 +209,11 @@ async function searchForMember(repo: MemberRepository) {
 }
 
 async function deleteMember(repo: MemberRepository) {
-  const memberId = await checkInt(
-    await readLine("Enter the Id of the Member to delete: ")
+  const memberId = await validateInput<number>(
+    "\nEnter the Id of the Member to delete: ",
+    MemberSchema.shape.id
   );
+
   const deletedMember = await repo.delete(memberId);
   if (!deletedMember) printError("Member not found");
   else {

@@ -78,4 +78,9 @@ export class MemberRepository implements IRepository<IMemberBase, IMember> {
       },
     };
   }
+  async reset() {
+    const members = this.db.table<IMember>(this.tableName);
+    members.length = 0;
+    await this.db.save();
+  }
 }

@@ -2,33 +2,29 @@ import { describe, test, expect, beforeEach, beforeAll } from "vitest";
 import { MemberRepository } from "./member.repository";
 import { IMemberBase, IMember } from "../models/member.schema";
 import { Database, JsonAdapter } from "../database/db";
+import { faker } from "@faker-js/faker";
+
+function createMemberObject() {
+  return {
+    name: faker.person.fullName(),
+    age: faker.datatype.number({ min: 18, max: 80 }),
+    phoneNumber: faker.phone.number("##########"),
+    address: faker.address.streetAddress(),
+  };
+}
 
 describe("MemberRepository", () => {
-  const db = new Database("database-test-files/json", JsonAdapter);
+  const db = new Database("database-test-files/db.json", JsonAdapter);
   const repository: MemberRepository = new MemberRepository(db);
 
   beforeAll(async () => {
-    const membersData: IMemberBase[] = [
+    await repository.reset();
+    const membersData: IMemberBase[] = faker.helpers.multiple(
+      createMemberObject,
       {
-        name: "John Doe",
-        age: 30,
-        phoneNumber: "1234567890",
-        address: "123 Main St",
-      },
-      {
-        name: "Jane Doe",
-        age: 25,
-        phoneNumber: "0987654321",
-        address: "456 Elm St",
-      },
-      {
-        name: "Jim Doe",
-        age: 35,
-        phoneNumber: "1112223333",
-        address: "789 Oak St",
-      },
-    ];
-
+        count: 5,
+      }
+    );
     await Promise.all(membersData.map((data) => repository.create(data)));
   });
 
@@ -42,7 +38,7 @@ describe("MemberRepository", () => {
       address: "123 Main Canada",
     };
     const newMember = await repository.create(memberData);
-    expect(newMember).toEqual({ id: 4, ...memberData });
+    expect(newMember).toEqual({ id: 6, ...memberData });
     expect(db.table("members")).toContainEqual(newMember);
   });
 
@@ -95,12 +91,13 @@ describe("MemberRepository", () => {
     expect(response.pagination).toEqual({
       offset: 0,
       limit: 2,
-      total: 4,
+      total: 6,
     });
   });
 
   test("search the books with pagination", async () => {
-    const params = { offset: 0, limit: 2, search: "Jane" };
+    const user = await repository.getById(2);
+    const params = { offset: 0, limit: 2, search: user?.name };
     const response = await repository.list(params);
 
     expect(response.items).toEqual([{ ...(await repository.getById(2)) }]);
