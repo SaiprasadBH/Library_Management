@@ -43,7 +43,7 @@ export class LibraryInteractor implements IInteractor {
 }
 
 // Initialize the database and pass it to LibraryInteractor
-const db = new Database("databse-files/db.json");
+const db = new Database("database-files/db.json");
 const libManager = new LibraryInteractor(db);
 
 libManager.showMenu();

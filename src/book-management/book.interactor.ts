@@ -96,23 +96,24 @@ async function validateInput<T>(
   schema: z.Schema<T>,
   existingValue?: T
 ): Promise<T> {
-  if (existingValue) {
-    const newInput =
-      (await readLine(`${question} (${existingValue ?? ""}):`)) ||
-      existingValue;
-    return schema.parse(
-      schema instanceof ZodNumber ? Number(newInput) : newInput
-    );
-  }
-  const input = await readLine(question);
-  try {
-    return schema.parse(schema instanceof ZodNumber ? Number(input) : input);
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      printError(`Invalid input: ${error.errors[0].message}`);
+  do {
+    if (existingValue) {
+      const newInput =
+        (await readLine(`${question} (${existingValue ?? ""}):`)) ||
+        existingValue;
+      return schema.parse(
+        schema instanceof ZodNumber ? Number(newInput) : newInput
+      );
     }
-    return validateInput(question, schema, existingValue);
-  }
+    const input = await readLine(question);
+    try {
+      return schema.parse(schema instanceof ZodNumber ? Number(input) : input);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        printError(`Invalid input: ${error.errors[0].message}`);
+      }
+    }
+  } while (true);
 }
 
 async function getBookInput(existingBook?: IBookBase): Promise<IBookBase> {
@@ -139,10 +140,10 @@ async function getBookInput(existingBook?: IBookBase): Promise<IBookBase> {
   );
   const genreArray = genre.split(",").map((g) => g.trim());
   //await validateInput("Enter genre: ", bookSchema.shape.genre, genreArray);
-  const isbNo = await validateInput<string>(
+  const isbnNo = await validateInput<string>(
     "Enter ISB number: ",
-    bookSchema.shape.isbNo,
-    existingBook?.isbNo
+    bookSchema.shape.isbnNo,
+    existingBook?.isbnNo
   );
   const numOfPages = await validateInput<number>(
     "Enter number of pages: ",
@@ -160,7 +161,7 @@ async function getBookInput(existingBook?: IBookBase): Promise<IBookBase> {
     author,
     publisher,
     genre: genreArray,
-    isbNo,
+    isbnNo,
     numOfPages,
     totalNumOfCopies,
   };

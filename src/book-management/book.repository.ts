@@ -69,7 +69,7 @@ export class BookRepository implements IRepository<IBookBase, IBook> {
       ? books.filter(
           (b) =>
             b.title.toLowerCase().includes(search) ||
-            b.isbNo.toLowerCase().includes(search)
+            b.isbnNo.toLowerCase().includes(search)
         )
       : books;
     return {

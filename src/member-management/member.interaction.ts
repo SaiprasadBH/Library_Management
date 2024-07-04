@@ -93,23 +93,25 @@ async function validateInput<T>(
   schema: z.Schema<T>,
   existingValue?: T
 ): Promise<T> {
-  if (existingValue) {
-    const newInput =
-      (await readLine(`${question} (${existingValue ?? ""}):`)) ||
-      existingValue;
-    return schema.parse(
-      schema instanceof ZodNumber ? Number(newInput) : newInput
-    );
-  }
-  const input = await readLine(question);
-  try {
-    return schema.parse(schema instanceof ZodNumber ? Number(input) : input);
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      printError(`Invalid input: ${error.errors[0].message}`);
+  do {
+    try {
+      if (existingValue) {
+        const newInput =
+          (await readLine(`${question} (${existingValue ?? ""}):`)) ||
+          existingValue;
+        return schema.parse(
+          schema instanceof ZodNumber ? Number(newInput) : newInput
+        );
+      }
+      const input = await readLine(question);
+
+      return schema.parse(schema instanceof ZodNumber ? Number(input) : input);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        printError(`Invalid input: ${error.errors[0].message}`);
+      }
     }
-    return validateInput(question, schema, existingValue);
-  }
+  } while (true);
 }
 
 async function getMemberInput(
