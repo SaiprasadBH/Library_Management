@@ -5,7 +5,7 @@ export interface IBookBase extends Row {
   author: string;
   publisher: string;
   genre: string[];
-  isbNo: string;
+  isbnNo: string;
   numOfPages: number;
   totalNumOfCopies: number;
 }

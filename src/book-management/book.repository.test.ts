@@ -10,14 +10,14 @@ function createBookObject(): IBookBase {
     author: faker.person.fullName(),
     publisher: faker.company.name(),
     genre: faker.lorem.words().split(" "),
-    isbNo: faker.string.uuid(),
+    isbnNo: faker.string.uuid(),
     numOfPages: faker.number.int({ min: 100, max: 1000 }),
     totalNumOfCopies: faker.number.int({ min: 1, max: 50 }),
   };
 }
 
 describe("BookRepository", () => {
-  const db = new Database("database-test-files/json", JsonAdapter);
+  const db = new Database("database-test-files/json.json", JsonAdapter);
   const repository: BookRepository = new BookRepository(db);
 
   beforeAll(async () => {
@@ -36,7 +36,7 @@ describe("BookRepository", () => {
       author: "Jane Smith",
       publisher: "Fiction House",
       genre: ["Fantasy", "Adventure"],
-      isbNo: "1234567890",
+      isbnNo: "1234567890",
       numOfPages: 350,
       totalNumOfCopies: 10,
     };
@@ -55,7 +55,7 @@ describe("BookRepository", () => {
       author: "John Doe",
       publisher: "Book Publishers",
       genre: ["Drama"],
-      isbNo: "9876543210",
+      isbnNo: "9876543210",
       numOfPages: 200,
       totalNumOfCopies: 5,
     };
@@ -66,7 +66,7 @@ describe("BookRepository", () => {
       author: "John Doe",
       publisher: "Updated Publishers",
       genre: ["Mystery", "Thriller"],
-      isbNo: "0987654321",
+      isbnNo: "0987654321",
       numOfPages: 300,
       totalNumOfCopies: 8,
     };
@@ -85,7 +85,7 @@ describe("BookRepository", () => {
       author: "Unknown Author",
       publisher: "Unknown Publisher",
       genre: ["None"],
-      isbNo: "1111111111",
+      isbnNo: "1111111111",
       numOfPages: 0,
       totalNumOfCopies: 0,
     };

@@ -10,7 +10,6 @@ const rl = readline.createInterface({
 export const readLine = (question: string): Promise<string> => {
   return new Promise((resolve) =>
     rl.question(chalk.green(question), (input) => {
-      // if(input === )
       resolve(input);
     })
   );
