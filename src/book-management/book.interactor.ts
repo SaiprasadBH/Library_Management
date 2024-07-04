@@ -13,6 +13,8 @@ import {
 import { IPageRequest } from "../core/pagination";
 import { Menu } from "../core/menu";
 import { Database } from "../database/db";
+import { ZodNumber, z } from "zod";
+import { BookSchema, bookSchema } from "../models/book.schema";
 
 const menu = new Menu([
   { key: "1", label: "Add a Book" },
@@ -61,6 +63,7 @@ export class BookInteractor implements IInteractor {
   }
 }
 
+//////////////////// Depricated
 const checkInt = async (value: string | number): Promise<number> => {
   if (typeof value === "number") return value;
   const intValue = parseInt(value);
@@ -86,63 +89,103 @@ const setUserInputOrDefault = async <_, T>(
     ? await getNonEmptyInput(question)
     : (await readLine(`${question} (${existingData ?? ""}):`)) || existingData;
 };
+////////////////////////
+
+async function validateInput<T>(
+  question: string,
+  schema: z.Schema<T>,
+  existingValue?: T
+): Promise<T> {
+  if (existingValue) {
+    const newInput =
+      (await readLine(`${question} (${existingValue ?? ""}):`)) ||
+      existingValue;
+    return schema.parse(
+      schema instanceof ZodNumber ? Number(newInput) : newInput
+    );
+  }
+  const input = await readLine(question);
+  try {
+    return schema.parse(schema instanceof ZodNumber ? Number(input) : input);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      printError(`Invalid input: ${error.errors[0].message}`);
+    }
+    return validateInput(question, schema, existingValue);
+  }
+}
 
 async function getBookInput(existingBook?: IBookBase): Promise<IBookBase> {
-  const title = await setUserInputOrDefault(
+  const title = await validateInput<string>(
     "Enter title: ",
+    bookSchema.shape.title,
     existingBook?.title
   );
-  const author = await setUserInputOrDefault(
+  const author = await validateInput<string>(
     "Enter author: ",
+    bookSchema.shape.author,
     existingBook?.author
   );
-  const publisher = await setUserInputOrDefault(
+  const publisher = await validateInput<string>(
     "Enter publisher: ",
+    bookSchema.shape.publisher,
     existingBook?.publisher
   );
   printHint("For multiple genres use ',' for separation between them.");
-  let genre = await setUserInputOrDefault("Enter genre: ", existingBook?.genre);
-  if (typeof genre === "string") genre = genre.split(",");
-  const isbNo = await setUserInputOrDefault(
+  let genre = await validateInput<string>(
+    "Enter genre: ",
+    z.string(),
+    existingBook?.genre?.join(", ")
+  );
+  const genreArray = genre.split(",").map((g) => g.trim());
+  //await validateInput("Enter genre: ", bookSchema.shape.genre, genreArray);
+  const isbNo = await validateInput<string>(
     "Enter ISB number: ",
+    bookSchema.shape.isbNo,
     existingBook?.isbNo
   );
-  const numOfPages = await checkInt(
-    await setUserInputOrDefault(
-      "Enter number of pages: ",
-      existingBook?.numOfPages
-    )
+  const numOfPages = await validateInput<number>(
+    "Enter number of pages: ",
+    bookSchema.shape.numOfPages,
+    existingBook?.numOfPages
   );
-  const totalNumOfCopies = await checkInt(
-    await setUserInputOrDefault(
-      "Enter total number of copies: ",
-      existingBook?.totalNumOfCopies
-    )
+  const totalNumOfCopies = await validateInput<number>(
+    "Enter total number of copies: ",
+    bookSchema.shape.totalNumOfCopies,
+    existingBook?.totalNumOfCopies
   );
+
   return {
-    title: title,
-    author: author,
-    publisher: publisher,
-    genre: genre,
-    isbNo: isbNo,
-    numOfPages: numOfPages,
-    totalNumOfCopies: totalNumOfCopies,
+    title,
+    author,
+    publisher,
+    genre: genreArray,
+    isbNo,
+    numOfPages,
+    totalNumOfCopies,
   };
 }
 
 async function addBook(repo: BookRepository) {
   console.log("");
-  const newBook: IBookBase = await getBookInput();
-  const createdBook: IBook = await repo.create(newBook);
-  printResult("Added the book successfully");
-  console.table(createdBook);
+  try {
+    const newBook: IBookBase = await getBookInput();
+    const createdBook: IBook = await repo.create(newBook);
+    if (createdBook) {
+      printResult("Added the book successfully");
+      console.table(createdBook);
+    }
+  } catch (error: unknown) {
+    if (error instanceof Error) console.log(error.message);
+  }
   await readLine("Press Enter to continue");
   return;
 }
 
 async function editBook(repo: BookRepository) {
-  const bookId = await checkInt(
-    await readLine("\nEnter the Id of the book to edit: ")
+  const bookId = await validateInput<number>(
+    "\nEnter the Id of the book to edit: ",
+    BookSchema.shape.id
   );
   const existingBook = await repo.getById(bookId);
   if (!existingBook) {
@@ -189,9 +232,11 @@ async function searchForBook(repo: BookRepository) {
 }
 
 async function deleteBook(repo: BookRepository) {
-  const bookId = await checkInt(
-    await readLine("Enter the Id of the book to delete: ")
+  const bookId = await validateInput<number>(
+    "\nEnter the Id of the book to delete: ",
+    BookSchema.shape.id
   );
+
   const deletedBook = await repo.delete(bookId);
   if (!deletedBook) printError("Book not found");
   else {
