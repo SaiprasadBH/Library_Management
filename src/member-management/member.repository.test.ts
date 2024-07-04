@@ -1,33 +1,59 @@
-import { describe, test, expect, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach, beforeAll } from "vitest";
 import { MemberRepository } from "./member.repository";
 import { IMemberBase, IMember } from "../models/member.schema";
+import { Database, JsonAdapter } from "../database/db";
 
 describe("MemberRepository", () => {
-  let repository: MemberRepository;
+  const db = new Database("database-test-files/json", JsonAdapter);
+  const repository: MemberRepository = new MemberRepository(db);
 
-  beforeEach(() => {
-    repository = new MemberRepository();
+  beforeAll(async () => {
+    const membersData: IMemberBase[] = [
+      {
+        name: "John Doe",
+        age: 30,
+        phoneNumber: "1234567890",
+        address: "123 Main St",
+      },
+      {
+        name: "Jane Doe",
+        age: 25,
+        phoneNumber: "0987654321",
+        address: "456 Elm St",
+      },
+      {
+        name: "Jim Doe",
+        age: 35,
+        phoneNumber: "1112223333",
+        address: "789 Oak St",
+      },
+    ];
+
+    await Promise.all(membersData.map((data) => repository.create(data)));
   });
 
-  test("Creating a new member", () => {
+  beforeEach(() => {});
+
+  test("Creating a new member", async () => {
     const memberData: IMemberBase = {
       name: "John Doe",
       age: 30,
       phoneNumber: "1234567890",
       address: "123 Main Canada",
     };
-    const newMember = repository.create(memberData);
-    expect(newMember).toEqual({ id: 1, ...memberData });
+    const newMember = await repository.create(memberData);
+    expect(newMember).toEqual({ id: 4, ...memberData });
+    expect(db.table("members")).toContainEqual(newMember);
   });
 
-  test("Updating a existing member's details", () => {
+  test("Updating a existing member's details", async () => {
     const memberData: IMemberBase = {
       name: "John Doe",
       age: 30,
       phoneNumber: "1234567890",
       address: "123 Main Canada",
     };
-    repository.create(memberData);
+    await repository.create(memberData);
 
     const updatedData: IMemberBase = {
       name: "John Doe",
@@ -35,113 +61,49 @@ describe("MemberRepository", () => {
       phoneNumber: "9876543210",
       address: "456 Delhi India",
     };
-    const updatedMember = repository.update(1, updatedData);
+    const updatedMember = await repository.update(1, updatedData);
     expect(updatedMember).toEqual({ id: 1, ...updatedData });
+    expect(db.table("members")).toContainEqual(updatedMember);
   });
 
-  test("should return null when updating a non-existing member", () => {
+  test("should return null when updating a non-existing member", async () => {
     const updatedData: IMemberBase = {
       name: "John Smith",
       age: 35,
       phoneNumber: "0987654321",
       address: "456 Elm St",
     };
-    const updatedMember = repository.update(999, updatedData);
+    const updatedMember = await repository.update(999, updatedData);
     expect(updatedMember).toBeNull();
   });
 
-  test("Deleting a member", () => {
-    const memberData: IMemberBase = {
-      name: "John Doe",
-      age: 30,
-      phoneNumber: "1234567890",
-      address: "123 Main St",
-    };
-    repository.create(memberData);
-
-    const deletedMember = repository.delete(1);
-    expect(deletedMember).toEqual({ id: 1, ...memberData });
+  test("Deleting a member", async () => {
+    const member = await repository.getById(1);
+    const deletedMember = await repository.delete(1);
+    expect(deletedMember).toEqual({ id: 1, ...member });
+    expect(db.table("members")).not.toContainEqual(deletedMember);
   });
 
-  test("should get a member by id", () => {
-    const memberData: IMemberBase = {
-      name: "John Doe",
-      age: 30,
-      phoneNumber: "1234567890",
-      address: "123 Main St",
-    };
-    repository.create(memberData);
-
-    const member = repository.getById(1);
-    expect(member).toEqual({ id: 1, ...memberData });
-  });
-
-  test("List the books with pagination", () => {
-    const membersData: IMemberBase[] = [
-      {
-        name: "John Doe",
-        age: 30,
-        phoneNumber: "1234567890",
-        address: "123 Main St",
-      },
-      {
-        name: "Jane Doe",
-        age: 25,
-        phoneNumber: "0987654321",
-        address: "456 Elm St",
-      },
-      {
-        name: "Jim Doe",
-        age: 35,
-        phoneNumber: "1112223333",
-        address: "789 Oak St",
-      },
-    ];
-
-    membersData.forEach((data) => repository.create(data));
-
+  test("List the books with pagination", async () => {
     const params = { offset: 0, limit: 2 };
-    const response = repository.list(params);
+    const response = await repository.list(params);
 
     expect(response.items).toEqual([
-      { id: 1, ...membersData[0] },
-      { id: 2, ...membersData[1] },
+      { ...(await repository.getById(2)) },
+      { ...(await repository.getById(3)) },
     ]);
     expect(response.pagination).toEqual({
       offset: 0,
       limit: 2,
-      total: 3,
+      total: 4,
     });
   });
 
-  test("List the books with pagination", () => {
-    const membersData: IMemberBase[] = [
-      {
-        name: "John Doe",
-        age: 30,
-        phoneNumber: "1234567890",
-        address: "123 Main St",
-      },
-      {
-        name: "Jane Doe",
-        age: 25,
-        phoneNumber: "0987654321",
-        address: "456 Elm St",
-      },
-      {
-        name: "Jim Doe",
-        age: 35,
-        phoneNumber: "1112223333",
-        address: "789 Oak St",
-      },
-    ];
-
-    membersData.forEach((data) => repository.create(data));
-
+  test("search the books with pagination", async () => {
     const params = { offset: 0, limit: 2, search: "Jane" };
-    const response = repository.list(params);
+    const response = await repository.list(params);
 
-    expect(response.items).toEqual([{ id: 2, ...membersData[1] }]);
+    expect(response.items).toEqual([{ ...(await repository.getById(2)) }]);
     expect(response.pagination).toEqual({
       offset: 0,
       limit: 2,
