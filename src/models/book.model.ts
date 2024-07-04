@@ -1,4 +1,6 @@
-export interface IBookBase {
+import { Row } from "../database/db";
+
+export interface IBookBase extends Row {
   title: string;
   author: string;
   publisher: string;
