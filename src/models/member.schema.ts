@@ -13,11 +13,9 @@ export const MemberBaseSchema = z.object({
     .string()
     .min(10, { message: "Phone number must be atleast 10 digits long." })
     .max(12, { message: "Phone number cannot be longer than 12 digits." }),
-  address: z
-    .string()
-    .min(5, {
-      message: "Address is too short, must be of minimum 5 characters long.",
-    }),
+  address: z.string().min(5, {
+    message: "Address is too short, must be of minimum 5 characters long.",
+  }),
 });
 
 export const MemberSchema = MemberBaseSchema.extend({

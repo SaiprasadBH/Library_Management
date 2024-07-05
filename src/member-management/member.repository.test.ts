@@ -3,18 +3,22 @@ import { MemberRepository } from "./member.repository";
 import { IMemberBase, IMember } from "../models/member.schema";
 import { Database, JsonAdapter } from "../database/db";
 import { faker } from "@faker-js/faker";
+import { LibraryDataset } from "../database/library.dataset";
 
 function createMemberObject() {
   return {
     name: faker.person.fullName(),
-    age: faker.datatype.number({ min: 18, max: 80 }),
+    age: faker.number.int({ min: 18, max: 80 }),
     phoneNumber: faker.phone.number("##########"),
     address: faker.address.streetAddress(),
   };
 }
 
 describe("MemberRepository", () => {
-  const db = new Database("database-test-files/db.json", JsonAdapter);
+  const db = new Database<LibraryDataset>(
+    "database-test-files/db.json",
+    JsonAdapter<LibraryDataset>()
+  );
   const repository: MemberRepository = new MemberRepository(db);
 
   beforeAll(async () => {

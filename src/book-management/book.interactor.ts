@@ -15,6 +15,7 @@ import { Menu } from "../core/menu";
 import { Database } from "../database/db";
 import { ZodNumber, z } from "zod";
 import { BookSchema, bookSchema } from "../models/book.schema";
+import { LibraryDataset } from "../database/library.dataset";
 
 const menu = new Menu([
   { key: "1", label: "Add a Book" },
@@ -26,7 +27,7 @@ const menu = new Menu([
 export class BookInteractor implements IInteractor {
   private repo: BookRepository;
 
-  constructor(db: Database) {
+  constructor(db: Database<LibraryDataset>) {
     this.repo = new BookRepository(db);
   }
 

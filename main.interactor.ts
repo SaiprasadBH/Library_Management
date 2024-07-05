@@ -5,6 +5,7 @@ import { printError, printTitle } from "./src/core/output.utils";
 import { Menu } from "./src/core/menu";
 import { Database } from "./src/database/db";
 import { MemberInteractor } from "./src/member-management/member.interaction";
+import { LibraryDataset } from "./src/database/library.dataset";
 
 const menu = new Menu([
   { key: "1", label: "Book Management" },
@@ -17,7 +18,7 @@ export class LibraryInteractor implements IInteractor {
   private readonly bookInteractor: BookInteractor;
   private readonly memberInteractor: MemberInteractor;
 
-  constructor(db: Database) {
+  constructor(db: Database<LibraryDataset>) {
     this.bookInteractor = new BookInteractor(db);
     this.memberInteractor = new MemberInteractor(db);
   }
@@ -43,7 +44,7 @@ export class LibraryInteractor implements IInteractor {
 }
 
 // Initialize the database and pass it to LibraryInteractor
-const db = new Database("database-files/db.json");
+const db = new Database<LibraryDataset>("database-files/db.json");
 const libManager = new LibraryInteractor(db);
 
 libManager.showMenu();

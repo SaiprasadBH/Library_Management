@@ -6,15 +6,16 @@ import {
   MemberBaseSchema,
 } from "../models/member.schema";
 import { Database } from "../database/db";
+import { LibraryDataset } from "../database/library.dataset";
 
 export class MemberRepository implements IRepository<IMemberBase, IMember> {
   private tableName: string = "members";
 
-  constructor(private readonly db: Database) {}
+  constructor(private readonly db: Database<LibraryDataset>) {}
 
   async create(data: IMemberBase): Promise<IMember> {
     const validatedData = MemberBaseSchema.parse(data);
-    const members = this.db.table<IMember>(this.tableName);
+    const members = this.db.table("members");
 
     const newMember: IMember = {
       ...validatedData,
@@ -26,7 +27,7 @@ export class MemberRepository implements IRepository<IMemberBase, IMember> {
   }
 
   async update(id: number, data: IMemberBase): Promise<IMember | null> {
-    const members = this.db.table<IMember>(this.tableName);
+    const members = this.db.table("members");
     const index = members.findIndex((member) => member.id === id);
     if (index !== -1) {
       const parsedData = MemberBaseSchema.parse(data);
@@ -43,7 +44,7 @@ export class MemberRepository implements IRepository<IMemberBase, IMember> {
   }
 
   async delete(id: number): Promise<IMember | null> {
-    const members = this.db.table<IMember>(this.tableName);
+    const members = this.db.table("members");
     const index = members.findIndex((member) => member.id === id);
     if (index !== -1) {
       const [deletedMember] = members.splice(index, 1);
@@ -54,13 +55,13 @@ export class MemberRepository implements IRepository<IMemberBase, IMember> {
   }
 
   async getById(id: number): Promise<IMember | null> {
-    const members = this.db.table<IMember>(this.tableName);
+    const members = this.db.table("members");
     const memberFound = members.find((member) => member.id === id);
     return memberFound || null;
   }
 
   async list(params: IPageRequest): Promise<IPagedResponse<IMember>> {
-    const members = this.db.table<IMember>(this.tableName);
+    const members = this.db.table("members");
     const search = params.search?.toLowerCase();
     const filteredMembers = search
       ? members.filter(
@@ -79,7 +80,7 @@ export class MemberRepository implements IRepository<IMemberBase, IMember> {
     };
   }
   async reset() {
-    const members = this.db.table<IMember>(this.tableName);
+    const members = this.db.table("members");
     members.length = 0;
     await this.db.save();
   }

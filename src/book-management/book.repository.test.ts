@@ -3,6 +3,7 @@ import { BookRepository } from "./book.repository";
 import { IBookBase, IBook } from "../models/book.model";
 import { Database, JsonAdapter } from "../database/db";
 import { faker } from "@faker-js/faker";
+import { LibraryDataset } from "../database/library.dataset";
 
 function createBookObject(): IBookBase {
   return {
@@ -10,14 +11,17 @@ function createBookObject(): IBookBase {
     author: faker.person.fullName(),
     publisher: faker.company.name(),
     genre: faker.lorem.words().split(" "),
-    isbnNo: faker.string.uuid(),
+    isbnNo: faker.string.alphanumeric(13),
     numOfPages: faker.number.int({ min: 100, max: 1000 }),
     totalNumOfCopies: faker.number.int({ min: 1, max: 50 }),
   };
 }
 
 describe("BookRepository", () => {
-  const db = new Database("database-test-files/json.json", JsonAdapter);
+  const db = new Database<LibraryDataset>(
+    "database-test-files/json.json",
+    JsonAdapter<LibraryDataset>()
+  );
   const repository: BookRepository = new BookRepository(db);
 
   beforeAll(async () => {
@@ -36,7 +40,7 @@ describe("BookRepository", () => {
       author: "Jane Smith",
       publisher: "Fiction House",
       genre: ["Fantasy", "Adventure"],
-      isbnNo: "1234567890",
+      isbnNo: "1234567890123",
       numOfPages: 350,
       totalNumOfCopies: 10,
     };
@@ -55,7 +59,7 @@ describe("BookRepository", () => {
       author: "John Doe",
       publisher: "Book Publishers",
       genre: ["Drama"],
-      isbnNo: "9876543210",
+      isbnNo: "9876543210231",
       numOfPages: 200,
       totalNumOfCopies: 5,
     };
@@ -66,13 +70,13 @@ describe("BookRepository", () => {
       author: "John Doe",
       publisher: "Updated Publishers",
       genre: ["Mystery", "Thriller"],
-      isbnNo: "0987654321",
+      isbnNo: "0987654321321",
       numOfPages: 300,
       totalNumOfCopies: 8,
     };
-    const updatedBook = await repository.update(1, updatedData);
+    const updatedBook = await repository.update(6, updatedData);
     expect(updatedBook).toEqual({
-      id: 1,
+      id: 6,
       availableNumOfCopies: 8,
       ...updatedData,
     });

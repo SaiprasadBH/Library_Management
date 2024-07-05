@@ -14,6 +14,7 @@ import { Menu } from "../core/menu";
 import { Database } from "../database/db";
 import { IMember, IMemberBase, MemberSchema } from "../models/member.schema";
 import { ZodNumber, z } from "zod";
+import { LibraryDataset } from "../database/library.dataset";
 
 const menu = new Menu([
   { key: "1", label: "Add a Member" },
@@ -25,7 +26,7 @@ const menu = new Menu([
 export class MemberInteractor implements IInteractor {
   private repo: MemberRepository;
 
-  constructor(db: Database) {
+  constructor(db: Database<LibraryDataset>) {
     this.repo = new MemberRepository(db);
   }
 

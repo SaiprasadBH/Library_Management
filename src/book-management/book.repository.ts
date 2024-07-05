@@ -3,17 +3,16 @@ import { IRepository } from "../core/repository";
 import { IBook } from "../models/book.model";
 import { bookSchema, IBookBase } from "../models/book.schema";
 import { Database } from "../database/db";
+import { LibraryDataset } from "../database/library.dataset";
 
 export class BookRepository implements IRepository<IBookBase, IBook> {
-  private tableName: string = "books";
-
-  constructor(private readonly db: Database) {}
+  constructor(private readonly db: Database<LibraryDataset>) {}
 
   async create(data: IBookBase): Promise<IBook> {
     // Validate data
     const validatedData = bookSchema.parse(data);
 
-    const books = this.db.table<IBook>(this.tableName);
+    const books = this.db.table("books");
     const book: IBook = {
       ...validatedData,
       id: books.length + 1,
@@ -25,7 +24,7 @@ export class BookRepository implements IRepository<IBookBase, IBook> {
   }
 
   async update(id: number, data: IBookBase): Promise<IBook | null> {
-    const books = this.db.table<IBook>(this.tableName);
+    const books = this.db.table("books");
     const index = books.findIndex((b) => b.id === id);
     if (index !== -1) {
       // Validate data
@@ -46,7 +45,7 @@ export class BookRepository implements IRepository<IBookBase, IBook> {
   }
 
   async delete(id: number): Promise<IBook | null> {
-    const books = this.db.table<IBook>(this.tableName);
+    const books = this.db.table("books");
     const index = books.findIndex((b) => b.id === id);
     if (index !== -1) {
       const [deletedBook] = books.splice(index, 1);
@@ -57,13 +56,13 @@ export class BookRepository implements IRepository<IBookBase, IBook> {
   }
 
   async getById(id: number): Promise<IBook | null> {
-    const books = this.db.table<IBook>(this.tableName);
+    const books = this.db.table("books");
     const book = books.find((b) => b.id === id);
     return book || null;
   }
 
   async list(params: IPageRequest): Promise<IPagedResponse<IBook>> {
-    const books = this.db.table<IBook>(this.tableName);
+    const books = this.db.table("books");
     const search = params.search?.toLowerCase();
     const filteredBooks = search
       ? books.filter(
@@ -83,7 +82,7 @@ export class BookRepository implements IRepository<IBookBase, IBook> {
   }
 
   async reset() {
-    const books = this.db.table<IBook>(this.tableName);
+    const books = this.db.table("books");
     books.length = 0;
     await this.db.save();
   }
