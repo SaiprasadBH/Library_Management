@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const bookSchema = z.object({
+export const BookSchemaBase = z.object({
   title: z
     .string({ message: "Book title must be a string." })
     .min(3, { message: "Title must be a minimum 3 characters long." }),
@@ -25,9 +25,10 @@ export const bookSchema = z.object({
     .positive("Total number of copies must be a positive integer"),
 });
 
-export const BookSchema = bookSchema.extend({
+export const BookSchema = BookSchemaBase.extend({
   id: z.number().int().min(1),
+  availableNumOfCopies: z.number().int().min(0).optional(),
 });
 
-export type IBookBase = z.input<typeof bookSchema>;
+export type IBookBase = z.input<typeof BookSchemaBase>;
 export type IBook = z.input<typeof BookSchema>;

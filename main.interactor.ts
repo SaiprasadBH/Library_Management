@@ -6,6 +6,7 @@ import { Menu } from "./src/core/menu";
 import { Database } from "./src/database/db";
 import { MemberInteractor } from "./src/member-management/member.interaction";
 import { LibraryDataset } from "./src/database/library.dataset";
+import { TransactionInteractor } from "./src/transaction-management/transaction.interaction";
 
 const menu = new Menu([
   { key: "1", label: "Book Management" },
@@ -17,10 +18,12 @@ const menu = new Menu([
 export class LibraryInteractor implements IInteractor {
   private readonly bookInteractor: BookInteractor;
   private readonly memberInteractor: MemberInteractor;
+  private readonly transactionInteractor: TransactionInteractor;
 
   constructor(db: Database<LibraryDataset>) {
     this.bookInteractor = new BookInteractor(db);
     this.memberInteractor = new MemberInteractor(db);
+    this.transactionInteractor = new TransactionInteractor(db);
   }
 
   async showMenu(): Promise<void> {
@@ -33,6 +36,9 @@ export class LibraryInteractor implements IInteractor {
         break;
       case "2":
         await this.memberInteractor.showMenu();
+        break;
+      case "3":
+        await this.transactionInteractor.showMenu();
         break;
       case "4":
         process.exit(0);

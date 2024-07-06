@@ -19,7 +19,7 @@ function createBookObject(): IBookBase {
 
 describe("BookRepository", () => {
   const db = new Database<LibraryDataset>(
-    "database-test-files/json.json",
+    "database-test-files/db.json",
     JsonAdapter<LibraryDataset>()
   );
   const repository: BookRepository = new BookRepository(db);

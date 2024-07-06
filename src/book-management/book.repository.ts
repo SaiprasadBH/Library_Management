@@ -1,7 +1,7 @@
 import { IPageRequest, IPagedResponse } from "../core/pagination";
 import { IRepository } from "../core/repository";
 import { IBook } from "../models/book.model";
-import { bookSchema, IBookBase } from "../models/book.schema";
+import { BookSchemaBase, IBookBase } from "../models/book.schema";
 import { Database } from "../database/db";
 import { LibraryDataset } from "../database/library.dataset";
 
@@ -10,7 +10,7 @@ export class BookRepository implements IRepository<IBookBase, IBook> {
 
   async create(data: IBookBase): Promise<IBook> {
     // Validate data
-    const validatedData = bookSchema.parse(data);
+    const validatedData = BookSchemaBase.parse(data);
 
     const books = this.db.table("books");
     const book: IBook = {
@@ -23,19 +23,25 @@ export class BookRepository implements IRepository<IBookBase, IBook> {
     return book;
   }
 
-  async update(id: number, data: IBookBase): Promise<IBook | null> {
+  async update(
+    id: number,
+    data: IBookBase,
+    availableNumOfCopies?: number
+  ): Promise<IBook | null> {
     const books = this.db.table("books");
     const index = books.findIndex((b) => b.id === id);
     if (index !== -1) {
-      // Validate data
-      const validatedData = bookSchema.parse(data);
+      const validatedData = BookSchemaBase.parse(data);
 
       const updatedBook: IBook = {
         ...books[index],
         ...validatedData,
         availableNumOfCopies:
-          validatedData.totalNumOfCopies -
-          (books[index].totalNumOfCopies - books[index].availableNumOfCopies),
+          availableNumOfCopies !== undefined
+            ? availableNumOfCopies
+            : validatedData.totalNumOfCopies -
+              (books[index].totalNumOfCopies -
+                books[index].availableNumOfCopies),
       };
       books[index] = updatedBook;
       await this.db.save();

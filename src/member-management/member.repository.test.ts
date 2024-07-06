@@ -9,8 +9,8 @@ function createMemberObject() {
   return {
     name: faker.person.fullName(),
     age: faker.number.int({ min: 18, max: 80 }),
-    phoneNumber: faker.phone.number("##########"),
-    address: faker.address.streetAddress(),
+    phoneNumber: faker.string.alphanumeric(10),
+    address: faker.location.city(),
   };
 }
 
@@ -66,7 +66,7 @@ describe("MemberRepository", () => {
     expect(db.table("members")).toContainEqual(updatedMember);
   });
 
-  test("should return null when updating a non-existing member", async () => {
+  test("Updating a non-existing member's details", async () => {
     const updatedData: IMemberBase = {
       name: "John Smith",
       age: 35,
