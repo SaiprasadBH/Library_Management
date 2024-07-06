@@ -14,7 +14,7 @@ import { IPageRequest } from "../core/pagination";
 import { Menu } from "../core/menu";
 import { Database } from "../database/db";
 import { ZodNumber, z } from "zod";
-import { BookSchema, bookSchema } from "../models/book.schema";
+import { BookSchema, BookSchemaBase } from "../models/book.schema";
 import { LibraryDataset } from "../database/library.dataset";
 
 const menu = new Menu([
@@ -120,17 +120,17 @@ async function validateInput<T>(
 async function getBookInput(existingBook?: IBookBase): Promise<IBookBase> {
   const title = await validateInput<string>(
     "Enter title: ",
-    bookSchema.shape.title,
+    BookSchemaBase.shape.title,
     existingBook?.title
   );
   const author = await validateInput<string>(
     "Enter author: ",
-    bookSchema.shape.author,
+    BookSchemaBase.shape.author,
     existingBook?.author
   );
   const publisher = await validateInput<string>(
     "Enter publisher: ",
-    bookSchema.shape.publisher,
+    BookSchemaBase.shape.publisher,
     existingBook?.publisher
   );
   printHint("For multiple genres use ',' for separation between them.");
@@ -143,17 +143,17 @@ async function getBookInput(existingBook?: IBookBase): Promise<IBookBase> {
   //await validateInput("Enter genre: ", bookSchema.shape.genre, genreArray);
   const isbnNo = await validateInput<string>(
     "Enter ISB number: ",
-    bookSchema.shape.isbnNo,
+    BookSchemaBase.shape.isbnNo,
     existingBook?.isbnNo
   );
   const numOfPages = await validateInput<number>(
     "Enter number of pages: ",
-    bookSchema.shape.numOfPages,
+    BookSchemaBase.shape.numOfPages,
     existingBook?.numOfPages
   );
   const totalNumOfCopies = await validateInput<number>(
     "Enter total number of copies: ",
-    bookSchema.shape.totalNumOfCopies,
+    BookSchemaBase.shape.totalNumOfCopies,
     existingBook?.totalNumOfCopies
   );
 
