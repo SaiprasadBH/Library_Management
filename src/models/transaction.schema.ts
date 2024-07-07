@@ -13,6 +13,7 @@ export const ITransactionSchema = ITransactionBaseSchema.extend({
   id: z
     .number({ message: "ID should be a number" })
     .int({ message: "ID cannot be a decimal number." }),
+  BookStatus: z.enum(["issued", "returned"]),
   dateOfIssue: z.date(),
   dueDate: z.date(),
 });

@@ -29,6 +29,7 @@ export class MemberRepository implements IRepository<IMemberBase, IMember> {
   async update(id: number, data: IMemberBase): Promise<IMember> {
     const members = this.db.table("members");
     const index = members.findIndex((member) => member.id === id);
+
     const parsedData = MemberBaseSchema.parse(data);
 
     const updatedMember = {

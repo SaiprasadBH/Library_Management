@@ -8,6 +8,7 @@ import {
   printError,
   printHint,
   printMenu,
+  printPanel,
   printResult,
   printSubTitle,
   printTitle,
@@ -21,11 +22,13 @@ import { BookRepository } from "../book-management/book.repository";
 import { MemberRepository } from "../member-management/member.repository";
 import { IBook } from "../models/book.schema";
 import { IMember } from "../models/member.schema";
+import { IPageRequest } from "../core/pagination";
 
 const menu = new Menu([
   { key: "1", label: "Issue Book" },
   { key: "2", label: "Return Book" },
-  { key: "3", label: "Previous Menu" },
+  { key: "3", label: "Search for Transaction" },
+  { key: "4", label: "Previous Menu" },
 ]);
 
 export class TransactionInteractor implements IInteractor {
@@ -43,12 +46,12 @@ export class TransactionInteractor implements IInteractor {
     let loop = true;
     while (loop) {
       printTitle();
-      printSubTitle("Member Management");
+      printSubTitle("Transaction Management");
       printMenu();
       const op = await readChar(menu.serialize());
       clearScreen();
       printTitle();
-      printSubTitle("Member Management");
+      printSubTitle("Transaction Management");
       const menuItem = menu.getItem(op);
       printChoice(`${menuItem?.label}`);
       switch (op.toLowerCase()) {
@@ -59,6 +62,9 @@ export class TransactionInteractor implements IInteractor {
           await returnBook(this.repo, this.bookRepo, this.memberRepo);
           break;
         case "3":
+          await searchForTransaction(this.repo);
+          break;
+        case "4":
           loop = false;
           break;
         default:
@@ -71,6 +77,97 @@ export class TransactionInteractor implements IInteractor {
     }
   }
 }
+
+// New function to search for transactions
+async function searchForTransaction(repo: TransactionRepository) {
+  printHint(
+    `Press ${enterButton} on empty search field to show all transactions. Default limit will be set to 5.`
+  );
+  const searchText = await readLine("Search for bookId or memberId: ");
+  const offset = 0;
+  const defaultLimit: number = 5;
+  printHint(`Press ${enterButton} to set default limit to 5`);
+  const limit = await checkInt(
+    await readLine("Enter limit: ", defaultLimit.toString())
+  );
+  const pageRequest: IPageRequest = { offset, limit };
+
+  const searchResultItems = await repo.list(searchText);
+  if (searchResultItems.length === 0) {
+    printError("No match found");
+  } else {
+    const currPage = searchResultItems.slice(offset, limit);
+    await loadPage(currPage, pageRequest, searchResultItems, searchText);
+  }
+  return;
+}
+
+// Function to update the page for pagination
+function updatePage(key: string, page: IPageRequest, items: ITransaction[]) {
+  const total = items.length;
+  let limit = page.limit;
+
+  if (key === "\u001b[C") {
+    if (page.offset + limit < total) {
+      page.offset = page.offset + limit;
+    }
+  } else if (key === "\u001b[D") {
+    if (page.offset - limit >= 0) {
+      page.offset = page.offset - limit;
+    }
+  }
+  const updatedPageIndex = Math.floor(page.offset / page.limit) + 1;
+  const updatedPage = items.slice(page.offset, limit + page.offset);
+  return { updatedPage, updatedPageIndex };
+}
+
+// Function to load the paginated results
+const loadPage = async (
+  initialPage: ITransaction[],
+  pageRequest: IPageRequest,
+  searchResultItems: ITransaction[],
+  searchText?: string
+) => {
+  let loadedPage = initialPage;
+  let pageIndex = 1;
+  const totalPages = Math.ceil(searchResultItems.length / pageRequest.limit);
+  while (true) {
+    clearScreen();
+    printResult(
+      searchText
+        ? `Search result for "${searchText}"`
+        : "All current transactions in the Library"
+    );
+    displayPage(loadedPage);
+
+    const navPanel = `${pageIndex === 1 ? "" : "<"} ${pageIndex}/${totalPages} ${pageIndex === totalPages ? "" : ">"}`;
+    printPanel(`${navPanel}`);
+
+    printHint(`Press ${enterButton} to continue`);
+    const key = await readChar();
+    if (key === "\u001b[C" || key === "\u001b[D") {
+      const { updatedPage, updatedPageIndex } = updatePage(
+        key,
+        pageRequest,
+        searchResultItems
+      );
+      loadedPage = updatedPage;
+      pageIndex = updatedPageIndex;
+    } else if (key === "\r") break;
+  }
+};
+
+// Function to display the transactions in a table format
+const displayPage = (items: ITransaction | ITransaction[]) => {
+  console.table(items);
+};
+const checkInt = async (value: string | number): Promise<number> => {
+  if (typeof value === "number") return value;
+  const intValue = parseInt(value);
+  if (!Number.isNaN(intValue)) return intValue;
+  printError(`Invalid Input, only input of type "number" is allowed!!`);
+  return checkInt(await readLine("Enter again: "));
+};
 
 async function validateInput<T>(question: string, schema: z.Schema<T>) {
   do {

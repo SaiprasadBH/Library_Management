@@ -275,12 +275,12 @@ const loadPage = async (
 
 async function searchForBook(repo: BookRepository) {
   printHint(
-    'Press "Enter" on empty search field to show all the books.Default limit will be set to 5.'
+    `Press ${enterButton} on empty search field to show all the books.Default limit will be set to 5.`
   );
   const searchText = await readLine("Search for title or ISBNo.: ");
   const offset = 0;
   const defaultLimit: number = 5;
-  printHint('Press "Enter" to set default limit to 5');
+  printHint(`Press ${enterButton} to set default limit to 5`);
   const limit = await checkInt(
     await readLine("Enter limit: ", defaultLimit.toString())
   );

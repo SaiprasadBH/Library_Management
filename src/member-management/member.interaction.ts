@@ -254,12 +254,12 @@ const loadPage = async (
 
 async function searchForMember(repo: MemberRepository) {
   printHint(
-    'Press "Enter" on empty search field to show all the members. Default limit will be set to 5.'
+    `Press ${enterButton} on empty search field to show all the members. Default limit will be set to 5.`
   );
   const searchText = await readLine("Search for Name or Phone No.: ");
   const offset = 0;
   const defaultLimit: number = 5;
-  printHint('Press "Enter" to set default limit to 5');
+  printHint(`Press ${enterButton} to set default limit to 5`);
   const limit = await checkInt(
     await readLine("Enter limit: ", defaultLimit.toString())
   );
