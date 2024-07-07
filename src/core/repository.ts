@@ -8,5 +8,5 @@ export interface IRepository<
   update(id: number, data: MutationModel): Promise<CompleteModel | null>;
   delete(id: number): Promise<CompleteModel | null>;
   getById(id: number): Promise<CompleteModel | null>;
-  list(params: IPageRequest): Promise<IPagedResponse<CompleteModel>>;
+  list(search: string): Promise<CompleteModel[]>;
 }

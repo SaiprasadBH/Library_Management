@@ -74,7 +74,7 @@ export class TransactionRepository
     throw new Error("Method not implemented.");
   }
   // Not Required
-  list(params: IPageRequest): Promise<IPagedResponse<ITransaction>> {
+  list(searchText?: string): Promise<ITransaction[]> {
     throw new Error("Method not implemented.");
   }
 

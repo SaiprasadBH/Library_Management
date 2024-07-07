@@ -26,21 +26,18 @@ export class MemberRepository implements IRepository<IMemberBase, IMember> {
     return newMember;
   }
 
-  async update(id: number, data: IMemberBase): Promise<IMember | null> {
+  async update(id: number, data: IMemberBase): Promise<IMember> {
     const members = this.db.table("members");
     const index = members.findIndex((member) => member.id === id);
-    if (index !== -1) {
-      const parsedData = MemberBaseSchema.parse(data);
+    const parsedData = MemberBaseSchema.parse(data);
 
-      const updatedMember = {
-        ...members[index],
-        ...parsedData,
-      };
-      members[index] = updatedMember;
-      await this.db.save();
-      return updatedMember;
-    }
-    return null;
+    const updatedMember = {
+      ...members[index],
+      ...parsedData,
+    };
+    members[index] = updatedMember;
+    await this.db.save();
+    return updatedMember;
   }
 
   async delete(id: number): Promise<IMember | null> {
@@ -60,9 +57,9 @@ export class MemberRepository implements IRepository<IMemberBase, IMember> {
     return memberFound || null;
   }
 
-  async list(params: IPageRequest): Promise<IPagedResponse<IMember>> {
+  async list(searchText?: string): Promise<IMember[]> {
     const members = this.db.table("members");
-    const search = params.search?.toLowerCase();
+    const search = searchText?.toLowerCase();
     const filteredMembers = search
       ? members.filter(
           (b) =>
@@ -70,14 +67,7 @@ export class MemberRepository implements IRepository<IMemberBase, IMember> {
             b.phoneNumber.includes(search)
         )
       : members;
-    return {
-      items: filteredMembers.slice(params.offset, params.limit + params.offset),
-      pagination: {
-        offset: params.offset,
-        limit: params.limit,
-        total: filteredMembers.length,
-      },
-    };
+    return filteredMembers;
   }
   async reset() {
     const members = this.db.table("members");

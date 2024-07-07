@@ -6,15 +6,21 @@ export const BookSchemaBase = z.object({
     .min(3, { message: "Title must be a minimum 3 characters long." }),
   author: z
     .string({ message: "Author name must be a string." })
-    .min(5, { message: "Author name must be minimum 5 characters long." }),
+    .min(3, { message: "Author name must be minimum 3 characters long." }),
   publisher: z
     .string({ message: "Publisher name must be a string." })
-    .min(5, { message: "Publisher name must be minimum 5 characters long." }),
-  genre: z.array(z.string({ message: "Genre must be a string." })),
+    .min(3, { message: "Publisher name must be minimum 3 characters long." }),
+  genre: z.array(
+    z
+      .string({ message: "Genre must be a string." })
+      .refine((val) => !/\d/.test(val), {
+        message: "Genre should not contain numbers.",
+      })
+  ),
   isbnNo: z
     .string()
-    .min(13, { message: "ISBN number must be minimum 13 characters long." })
-    .max(13, { message: "ISBN number must be maximum 13 characters long." }),
+    .min(13, { message: "ISBN number must be 13 characters long." })
+    .max(13, { message: "ISBN number must be 13 characters long." }),
   numOfPages: z
     .number({ message: "Number of pages must be a number." })
     .int({ message: "Number of pages cannot be a decimal number." })

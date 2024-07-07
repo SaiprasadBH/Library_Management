@@ -3,9 +3,12 @@ import { clearScreen, readChar, readLine } from "../core/input.utils";
 import { BookRepository } from "./book.repository";
 import { IBook, IBookBase } from "../models/book.model";
 import {
+  enterButton,
   printChoice,
   printError,
   printHint,
+  printMenu,
+  printPanel,
   printResult,
   printSubTitle,
   printTitle,
@@ -36,9 +39,13 @@ export class BookInteractor implements IInteractor {
     while (loop) {
       printTitle();
       printSubTitle("Book Management");
+      printMenu();
       const op = await readChar(menu.serialize());
+      clearScreen();
+      printTitle();
+      printSubTitle("Book Management");
       const menuItem = menu.getItem(op);
-      printSubTitle(`${menuItem?.label}`);
+      printChoice(`${menuItem?.label}`);
       switch (op.toLowerCase()) {
         case "1":
           await addBook(this.repo);
@@ -56,7 +63,9 @@ export class BookInteractor implements IInteractor {
           loop = false;
           break;
         default:
-          printError("Invalid Input");
+          printError("Invalid choice");
+          printHint(`Press ${enterButton} to continue`);
+          await readLine("");
           break;
       }
       clearScreen();
@@ -64,7 +73,6 @@ export class BookInteractor implements IInteractor {
   }
 }
 
-//////////////////// Depricated
 const checkInt = async (value: string | number): Promise<number> => {
   if (typeof value === "number") return value;
   const intValue = parseInt(value);
@@ -73,6 +81,7 @@ const checkInt = async (value: string | number): Promise<number> => {
   return checkInt(await readLine("Enter again: "));
 };
 
+//////////////////// Depricated
 const getNonEmptyInput = async (question: string): Promise<string> => {
   const answer = await readLine(question);
   if (answer.trim() !== "") {
@@ -98,17 +107,18 @@ async function validateInput<T>(
   existingValue?: T
 ): Promise<T> {
   do {
-    if (existingValue) {
-      const newInput =
-        (await readLine(`${question} (${existingValue ?? ""}):`)) ||
-        existingValue;
+    try {
+      let newInput: string;
+      if (existingValue) {
+        newInput = await readLine(`${question} `, existingValue.toString());
+        return schema.parse(
+          schema instanceof ZodNumber ? Number(newInput) : newInput
+        );
+      }
+      newInput = await readLine(question);
       return schema.parse(
         schema instanceof ZodNumber ? Number(newInput) : newInput
       );
-    }
-    const input = await readLine(question);
-    try {
-      return schema.parse(schema instanceof ZodNumber ? Number(input) : input);
     } catch (error) {
       if (error instanceof z.ZodError) {
         printError(`Invalid input: ${error.errors[0].message}`);
@@ -169,24 +179,24 @@ async function getBookInput(existingBook?: IBookBase): Promise<IBookBase> {
 }
 
 async function addBook(repo: BookRepository) {
-  console.log("");
   try {
     const newBook: IBookBase = await getBookInput();
     const createdBook: IBook = await repo.create(newBook);
     if (createdBook) {
       printResult("Added the book successfully");
-      console.table(createdBook);
+      displayPage(createdBook);
     }
   } catch (error: unknown) {
     if (error instanceof Error) console.log(error.message);
   }
-  await readLine("Press Enter to continue");
+  printHint(`Press ${enterButton} to continue`);
+  await readLine("");
   return;
 }
 
 async function editBook(repo: BookRepository) {
   const bookId = await validateInput<number>(
-    "\nEnter the Id of the book to edit: ",
+    "Enter the Id of the book to edit: ",
     BookSchema.shape.id
   );
   const existingBook = await repo.getById(bookId);
@@ -194,42 +204,95 @@ async function editBook(repo: BookRepository) {
     printError("Book not found");
   } else {
     printHint(
-      'Press "Enter" if you don\'t want to change the current property.'
+      `Press ${enterButton} if you don't want to change the current property.\n`
     );
     const updatedData = await getBookInput(existingBook);
     const updatedBook = await repo.update(existingBook.id, updatedData);
     printResult("Book updated successfully");
-    console.table(updatedBook);
+    displayPage(updatedBook);
   }
-  await readLine("Press Enter to continue");
+  printHint(`Press ${enterButton} to continue`);
+  await readLine("");
   return;
 }
 
+const displayPage = (items: IBook | IBook[]) => {
+  console.table(items);
+};
+
+function updatePage(key: string, page: IPageRequest, items: IBook[]) {
+  const total = items.length;
+  let limit = page.limit;
+
+  if (key === "\u001b[C") {
+    if (page.offset + limit < total) {
+      page.offset = page.offset + limit;
+    }
+  } else if (key === "\u001b[D") {
+    if (page.offset - limit >= 0) {
+      page.offset = page.offset - limit;
+    }
+  }
+  const updatedPageIndex = Math.floor(page.offset / page.limit) + 1;
+  const updatedPage = items.slice(page.offset, limit + page.offset);
+  return { updatedPage, updatedPageIndex };
+}
+
+const loadPage = async (
+  initialPage: IBook[],
+  pageRequest: IPageRequest,
+  searchResultItems: IBook[],
+  searchText?: string
+) => {
+  let loadedPage = initialPage;
+  let pageIndex = 1;
+  const totalPages = Math.ceil(searchResultItems.length / pageRequest.limit);
+  while (true) {
+    clearScreen();
+    printResult(
+      searchText
+        ? `Search result for "${searchText}"`
+        : "All current books in the Library"
+    );
+    displayPage(loadedPage);
+
+    const navPanel = `${pageIndex === 1 ? "" : "<"} ${pageIndex}/${totalPages} ${pageIndex === totalPages ? "" : ">"}`;
+    printPanel(`${navPanel}`);
+
+    printHint(`Press ${enterButton} to continue`);
+    const key = await readChar();
+    if (key === "\u001b[C" || key === "\u001b[D") {
+      const { updatedPage, updatedPageIndex } = updatePage(
+        key,
+        pageRequest,
+        searchResultItems
+      );
+      loadedPage = updatedPage;
+      pageIndex = updatedPageIndex;
+    } else if (key === "\r") break;
+  }
+};
+
 async function searchForBook(repo: BookRepository) {
-  const search = await getNonEmptyInput("\nSearch for title or ISBNo.\n");
-  printHint('Press "Enter" to set default offset to 0');
-  const defaultOffset: string | number = "-";
-  const defaultLimit: number = 5;
-  const offset = await checkInt(
-    await setUserInputOrDefault("Enter offset: ", defaultOffset)
+  printHint(
+    'Press "Enter" on empty search field to show all the books.Default limit will be set to 5.'
   );
+  const searchText = await readLine("Search for title or ISBNo.: ");
+  const offset = 0;
+  const defaultLimit: number = 5;
   printHint('Press "Enter" to set default limit to 5');
   const limit = await checkInt(
-    await setUserInputOrDefault("Enter limit: ", defaultLimit)
+    await readLine("Enter limit: ", defaultLimit.toString())
   );
-  const pageRequest: IPageRequest = { search, offset, limit };
-  const searchResult = await repo.list(pageRequest);
-  if (searchResult.items.length === 0) {
+  const pageRequest: IPageRequest = { offset, limit };
+
+  const searchResultItems = await repo.list(searchText);
+  if (searchResultItems.length === 0) {
     printError("No match found");
   } else {
-    searchResult.items.forEach((matchedBook) => {
-      console.table(matchedBook);
-    });
-    printResult(
-      `Showing ${limit} results out of ${searchResult.pagination.total}`
-    );
+    const currPage = searchResultItems.slice(offset, limit);
+    await loadPage(currPage, pageRequest, searchResultItems, searchText);
   }
-  await readLine("Press Enter to continue");
   return;
 }
 
@@ -245,7 +308,7 @@ async function deleteBook(repo: BookRepository) {
     printResult(
       `The book ${deletedBook.title} with Id ${bookId} deleted successfully`
     );
-    console.table(deletedBook);
+    displayPage(deletedBook);
   }
   await readLine("Press Enter to continue");
   return;

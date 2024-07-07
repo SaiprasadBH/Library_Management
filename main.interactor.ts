@@ -1,7 +1,14 @@
 import { IInteractor } from "./src/core/interactor";
 import { clearScreen, readChar, readLine } from "./src/core/input.utils";
 import { BookInteractor } from "./src/book-management/book.interactor";
-import { printError, printTitle } from "./src/core/output.utils";
+import {
+  enterButton,
+  printError,
+  printHint,
+  printMenu,
+  printPanel,
+  printTitle,
+} from "./src/core/output.utils";
 import { Menu } from "./src/core/menu";
 import { Database } from "./src/database/db";
 import { MemberInteractor } from "./src/member-management/member.interaction";
@@ -29,21 +36,31 @@ export class LibraryInteractor implements IInteractor {
   async showMenu(): Promise<void> {
     clearScreen();
     printTitle();
+    printMenu();
     const op = await readChar(menu.serialize());
     switch (op.toLowerCase()) {
       case "1":
+        clearScreen();
         await this.bookInteractor.showMenu();
         break;
       case "2":
+        clearScreen();
         await this.memberInteractor.showMenu();
         break;
       case "3":
+        clearScreen();
         await this.transactionInteractor.showMenu();
         break;
       case "4":
+        console.log("\n");
+        printPanel("! ! ! Bye ! ! !");
+        console.log("\n");
         process.exit(0);
       default:
-        printError("Invalid Input");
+        printError("Invalid choice");
+        printHint(`Press ${enterButton} to continue`);
+        await readLine("");
+        break;
     }
     this.showMenu();
   }

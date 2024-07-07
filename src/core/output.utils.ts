@@ -1,15 +1,19 @@
 import chalk from "chalk";
 
 export function printTitle() {
-  console.log(chalk.bgGreenBright("\n---Library Management"));
+  console.log(chalk.bgGreenBright.bold(" Library Management "));
 }
 
 export function printSubTitle(subTitle: string) {
-  console.log(chalk.bgCyan(`\n--${subTitle}`));
+  console.log(chalk.bgCyan.bold(`\n ${subTitle} `));
 }
 
 export function printChoice(choice: string) {
-  console.log(chalk.bgBlueBright(`\n-${choice}`));
+  console.log(chalk.bgBlueBright.bold(`\n ${choice} \n`));
+}
+
+export function printMenu() {
+  console.log(chalk.bgGreen.bold("\n        Menu        \n"));
 }
 
 export function printQuestion(question: string) {
@@ -17,19 +21,25 @@ export function printQuestion(question: string) {
 }
 
 export function printError(msg: string) {
-  console.error(`\n${chalk.red.bold(msg)}\n`);
+  console.error(`\n${chalk.red.bold(msg)}`);
 }
 
 export function printHint(msg: string) {
-  console.log(`\n${chalk.grey(msg)}\n`);
+  console.log(`\n${chalk.grey(msg)}`);
 }
 
 export function printResult(msg: string) {
-  console.log(`\n${chalk.bgGreen(msg)}`);
+  console.log(`\n${chalk.bgGreen.bold(` ${msg} `)}`);
 }
 
-// printQuestion("gsdgngfn");
-// printError("sfsdngnz");
-// printQuestion("gsdgngfn");
-// printHint("asfbfbb");
-// printQuestion("gsdgngfn");
+export function printPanel(panelTemplate: string) {
+  const panelItems = panelTemplate.trim().split(" ");
+  const formatedPanelItems = panelItems.map((item) =>
+    chalk.bgGreen.bold(` ${item} `)
+  );
+  console.log(...formatedPanelItems);
+}
+
+export const rArrowButton = chalk.bgGreen(" > ");
+export const lArrowButton = chalk.bgGreen(" < ");
+export const enterButton = chalk.bgGreen.bold(" Enter ");

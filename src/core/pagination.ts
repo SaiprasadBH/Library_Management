@@ -1,3 +1,4 @@
+//////////////////// Depricated
 export interface IPagedResponse<T> {
   items: T[];
   pagination: {
@@ -6,6 +7,8 @@ export interface IPagedResponse<T> {
     total: number;
   };
 }
+////////////////////
+
 export interface IPageRequest {
   search?: string;
   offset: number;

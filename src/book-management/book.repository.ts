@@ -1,4 +1,4 @@
-import { IPageRequest, IPagedResponse } from "../core/pagination";
+// import { IPageRequest, IPagedResponse } from "../core/pagination";
 import { IRepository } from "../core/repository";
 import { IBook } from "../models/book.model";
 import { BookSchemaBase, IBookBase } from "../models/book.schema";
@@ -27,27 +27,25 @@ export class BookRepository implements IRepository<IBookBase, IBook> {
     id: number,
     data: IBookBase,
     availableNumOfCopies?: number
-  ): Promise<IBook | null> {
+  ): Promise<IBook> {
     const books = this.db.table("books");
     const index = books.findIndex((b) => b.id === id);
-    if (index !== -1) {
-      const validatedData = BookSchemaBase.parse(data);
 
-      const updatedBook: IBook = {
-        ...books[index],
-        ...validatedData,
-        availableNumOfCopies:
-          availableNumOfCopies !== undefined
-            ? availableNumOfCopies
-            : validatedData.totalNumOfCopies -
-              (books[index].totalNumOfCopies -
-                books[index].availableNumOfCopies),
-      };
-      books[index] = updatedBook;
-      await this.db.save();
-      return updatedBook;
-    }
-    return null;
+    // Validate data
+    const validatedData = BookSchemaBase.parse(data);
+
+    const updatedBook: IBook = {
+      ...books[index],
+      ...validatedData,
+      availableNumOfCopies:
+        availableNumOfCopies !== undefined
+          ? availableNumOfCopies
+          : validatedData.totalNumOfCopies -
+            (books[index].totalNumOfCopies - books[index].availableNumOfCopies),
+    };
+    books[index] = updatedBook;
+    await this.db.save();
+    return updatedBook;
   }
 
   async delete(id: number): Promise<IBook | null> {
@@ -67,9 +65,9 @@ export class BookRepository implements IRepository<IBookBase, IBook> {
     return book || null;
   }
 
-  async list(params: IPageRequest): Promise<IPagedResponse<IBook>> {
+  async list(searchText?: string): Promise<IBook[]> {
     const books = this.db.table("books");
-    const search = params.search?.toLowerCase();
+    const search = searchText?.toLowerCase();
     const filteredBooks = search
       ? books.filter(
           (b) =>
@@ -77,14 +75,7 @@ export class BookRepository implements IRepository<IBookBase, IBook> {
             b.isbnNo.toLowerCase().includes(search)
         )
       : books;
-    return {
-      items: filteredBooks.slice(params.offset, params.limit + params.offset),
-      pagination: {
-        offset: params.offset,
-        limit: params.limit,
-        total: filteredBooks.length,
-      },
-    };
+    return filteredBooks;
   }
 
   async reset() {

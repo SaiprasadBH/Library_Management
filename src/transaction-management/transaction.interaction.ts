@@ -3,9 +3,11 @@ import { clearScreen, readChar, readLine } from "../core/input.utils";
 import { IInteractor } from "../core/interactor";
 import { Menu } from "../core/menu";
 import {
+  enterButton,
   printChoice,
   printError,
   printHint,
+  printMenu,
   printResult,
   printSubTitle,
   printTitle,
@@ -42,7 +44,11 @@ export class TransactionInteractor implements IInteractor {
     while (loop) {
       printTitle();
       printSubTitle("Member Management");
+      printMenu();
       const op = await readChar(menu.serialize());
+      clearScreen();
+      printTitle();
+      printSubTitle("Member Management");
       const menuItem = menu.getItem(op);
       printChoice(`${menuItem?.label}`);
       switch (op.toLowerCase()) {
@@ -56,7 +62,9 @@ export class TransactionInteractor implements IInteractor {
           loop = false;
           break;
         default:
-          printError("Invalid Input");
+          printError("Invalid choice");
+          printHint(`Press ${enterButton} to continue`);
+          await readLine("");
           break;
       }
       clearScreen();
@@ -162,7 +170,8 @@ async function issueBook(
   } catch (error: unknown) {
     if (error instanceof Error) console.log(error.message);
   }
-  await readLine("Press Enter to continue");
+  printHint(`Press ${enterButton} to continue`);
+  await readLine("");
   return;
 }
 
@@ -189,6 +198,7 @@ async function returnBook(
   } catch (error: unknown) {
     if (error instanceof Error) console.log(error.message);
   }
-  await readLine("Press Enter to continue");
+  printHint(`Press ${enterButton} to continue`);
+  await readLine("");
   return;
 }

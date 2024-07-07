@@ -2,9 +2,12 @@ import { IInteractor } from "../core/interactor";
 import { clearScreen, readChar, readLine } from "../core/input.utils";
 import { MemberRepository } from "./member.repository";
 import {
+  enterButton,
   printChoice,
   printError,
   printHint,
+  printMenu,
+  printPanel,
   printResult,
   printSubTitle,
   printTitle,
@@ -35,7 +38,11 @@ export class MemberInteractor implements IInteractor {
     while (loop) {
       printTitle();
       printSubTitle("Member Management");
+      printMenu();
       const op = await readChar(menu.serialize());
+      clearScreen();
+      printTitle();
+      printSubTitle("Member Management");
       const menuItem = menu.getItem(op);
       printChoice(`${menuItem?.label}`);
       switch (op.toLowerCase()) {
@@ -55,7 +62,9 @@ export class MemberInteractor implements IInteractor {
           loop = false;
           break;
         default:
-          printError("Invalid Input");
+          printError("Invalid choice");
+          printHint(`Press ${enterButton} to continue`);
+          await readLine("");
           break;
       }
       clearScreen();
@@ -71,6 +80,7 @@ const checkInt = async (value: string | number): Promise<number> => {
   return checkInt(await readLine("Enter again: "));
 };
 
+//////////////////// Depricated
 const getNonEmptyInput = async (question: string): Promise<string> => {
   const answer = await readLine(question);
   if (answer.trim() !== "") {
@@ -88,6 +98,7 @@ const setUserInputOrDefault = async <_, T>(
     ? await getNonEmptyInput(question)
     : (await readLine(`${question} (${existingData ?? ""}):`)) || existingData;
 };
+////////////////////
 
 async function validateInput<T>(
   question: string,
@@ -96,17 +107,17 @@ async function validateInput<T>(
 ): Promise<T> {
   do {
     try {
+      let newInput: string;
       if (existingValue) {
-        const newInput =
-          (await readLine(`${question} (${existingValue ?? ""}):`)) ||
-          existingValue;
+        newInput = await readLine(`${question} `, existingValue.toString());
         return schema.parse(
           schema instanceof ZodNumber ? Number(newInput) : newInput
         );
       }
-      const input = await readLine(question);
-
-      return schema.parse(schema instanceof ZodNumber ? Number(input) : input);
+      newInput = await readLine(question);
+      return schema.parse(
+        schema instanceof ZodNumber ? Number(newInput) : newInput
+      );
     } catch (error) {
       if (error instanceof z.ZodError) {
         printError(`Invalid input: ${error.errors[0].message}`);
@@ -147,24 +158,24 @@ async function getMemberInput(
   };
 }
 async function addMember(repo: MemberRepository) {
-  console.log("");
   try {
     const newMember: IMemberBase = await getMemberInput();
     const createdMember: IMember = await repo.create(newMember);
     if (createdMember) {
       printResult("Added the Member successfully");
-      console.table(createdMember);
+      displayPage(createdMember);
     }
   } catch (error: unknown) {
     if (error instanceof Error) console.log(error.message);
   }
-  await readLine("Press Enter to continue");
+  printHint(`Press ${enterButton} to continue`);
+  await readLine("");
   return;
 }
 
 async function editMember(repo: MemberRepository) {
   const memberId = await validateInput<number>(
-    "\nEnter the Id of the Member to edit: ",
+    "Enter the Id of the Member to edit: ",
     MemberSchema.shape.id
   );
   const existingMember = await repo.getById(memberId);
@@ -172,42 +183,96 @@ async function editMember(repo: MemberRepository) {
     printError("Member not found");
   } else {
     printHint(
-      'Press "Enter" if you don\'t want to change the current property.'
+      `Press ${enterButton} if you don't want to change the current property.\n`
     );
     const updatedData = await getMemberInput(existingMember);
     const updatedMember = await repo.update(existingMember.id, updatedData);
     printResult("Member updated successfully");
-    console.table(updatedMember);
+    displayPage(updatedMember);
   }
-  await readLine("Press Enter to continue");
+  printHint(`Press ${enterButton} to continue`);
+  await readLine("");
   return;
 }
 
+const displayPage = (items: IMember | IMember[]) => {
+  console.table(items);
+};
+
+function updatePage(key: string, page: IPageRequest, items: IMember[]) {
+  const total = items.length;
+  let limit = page.limit;
+
+  if (key === "\u001b[C") {
+    if (page.offset + limit < total) {
+      page.offset = page.offset + limit;
+    }
+  } else if (key === "\u001b[D") {
+    if (page.offset - limit >= 0) {
+      page.offset = page.offset - limit;
+    }
+  }
+  const updatedPageIndex = Math.floor(page.offset / page.limit) + 1;
+  const updatedPage = items.slice(page.offset, limit + page.offset);
+  return { updatedPage, updatedPageIndex };
+}
+
+const loadPage = async (
+  initialPage: IMember[],
+  pageRequest: IPageRequest,
+  searchResultItems: IMember[],
+  searchText?: string
+) => {
+  let loadedPage = initialPage;
+  let pageIndex = 1;
+  const totalPages = Math.ceil(searchResultItems.length / pageRequest.limit);
+  while (true) {
+    clearScreen();
+    printResult(
+      searchText
+        ? `Search result for "${searchText}"`
+        : "All current members of the Library"
+    );
+    displayPage(loadedPage);
+
+    const navPanel = `${pageIndex === 1 ? "" : "<"} ${pageIndex}/${totalPages} ${pageIndex === totalPages ? "" : ">"}`;
+    printPanel(`${navPanel}`);
+
+    printHint(`Press ${enterButton} to continue`);
+    const key = await readChar();
+    if (key === "\u001b[C" || key === "\u001b[D") {
+      const { updatedPage, updatedPageIndex } = updatePage(
+        key,
+        pageRequest,
+        searchResultItems
+      );
+      loadedPage = updatedPage;
+      pageIndex = updatedPageIndex;
+    } else if (key === "\r") break;
+  }
+};
+
 async function searchForMember(repo: MemberRepository) {
-  const search = await getNonEmptyInput("\nSearch for title or ISBNo.\n");
-  printHint('Press "Enter" to set default offset to 0');
-  const defaultOffset: string | number = "-";
-  const defaultLimit: number = 5;
-  const offset = await checkInt(
-    await setUserInputOrDefault("Enter offset: ", defaultOffset)
+  printHint(
+    'Press "Enter" on empty search field to show all the members. Default limit will be set to 5.'
   );
+  const searchText = await readLine("Search for Name or Phone No.: ");
+  const offset = 0;
+  const defaultLimit: number = 5;
   printHint('Press "Enter" to set default limit to 5');
   const limit = await checkInt(
-    await setUserInputOrDefault("Enter limit: ", defaultLimit)
+    await readLine("Enter limit: ", defaultLimit.toString())
   );
-  const pageRequest: IPageRequest = { search, offset, limit };
-  const searchResult = await repo.list(pageRequest);
-  if (searchResult.items.length === 0) {
+  const pageRequest: IPageRequest = { offset, limit };
+
+  const searchResultItems = await repo.list(searchText);
+  if (searchResultItems.length === 0) {
     printError("No match found");
   } else {
-    searchResult.items.forEach((matchedMember) => {
-      console.table(matchedMember);
-    });
-    printResult(
-      `Showing ${limit} results out of ${searchResult.pagination.total}`
-    );
+    const currPage = searchResultItems.slice(offset, limit);
+    await loadPage(currPage, pageRequest, searchResultItems, searchText);
   }
-  await readLine("Press Enter to continue");
+
   return;
 }
 
