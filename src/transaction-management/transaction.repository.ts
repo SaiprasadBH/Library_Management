@@ -32,11 +32,7 @@ export class TransactionRepository
       dateOfIssue: new Date(),
       dueDate: new Date(new Date().setDate(new Date().getDate() + 14)),
     };
-    const newBook = await this.bookRepo.update(
-      book.id,
-      book,
-      book.availableNumOfCopies - 1
-    );
+    await this.bookRepo.update(book.id, book, book.availableNumOfCopies - 1);
     transactions.push(newTransaction);
     await this.db.save();
     return newTransaction;
@@ -62,7 +58,7 @@ export class TransactionRepository
       return transaction;
     } else {
       throw new Error(
-        "Transaction not found.\n Please enter correct transaction ID."
+        "Transaction not found. Please enter correct transaction ID."
       );
     }
   }
@@ -92,8 +88,24 @@ export class TransactionRepository
   }
 
   async reset() {
-    const members = this.db.table("transactions");
-    members.length = 0;
+    const transactions = this.db.table("transactions");
+    transactions.length = 0;
     await this.db.save();
+  }
+
+  // Helper functions
+  async getBookByISBN(isbnNo: string) {
+    return this.bookRepo
+      .list()
+      .then((books) => books.find((book) => book.isbnNo === isbnNo) || null);
+  }
+
+  async getMemberByPhoneNumber(phoneNumber: string) {
+    return this.memberRepo
+      .list()
+      .then(
+        (members) =>
+          members.find((member) => member.phoneNumber === phoneNumber) || null
+      );
   }
 }

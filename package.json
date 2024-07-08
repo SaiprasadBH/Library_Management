@@ -4,7 +4,8 @@
   "description": "Command line tool for library management system.",
   "main": "index.js",
   "scripts": {
-    "test": "vitest"
+    "test": "vitest",
+    "start": "ts-node main.interactor.ts"
   },
   "author": "",
   "license": "ISC",
