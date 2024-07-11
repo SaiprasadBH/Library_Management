@@ -17,7 +17,11 @@ import { IPageRequest } from "../core/pagination";
 import { Menu } from "../core/menu";
 import { Database } from "../database/db";
 import { ZodNumber, z } from "zod";
-import { BookSchema, BookSchemaBase } from "../models/book.schema";
+import {
+  BookSchema,
+  BookSchemaBase,
+  zNonNumString,
+} from "../models/book.schema";
 import { LibraryDataset } from "../database/library.dataset";
 
 const menu = new Menu([
@@ -146,7 +150,7 @@ async function getBookInput(existingBook?: IBookBase): Promise<IBookBase> {
   printHint("For multiple genres use ',' for separation between them.");
   let genre = await validateInput<string>(
     "Enter genre: ",
-    z.string(),
+    zNonNumString,
     existingBook?.genre?.join(", ")
   );
   const genreArray = genre.split(",").map((g) => g.trim());

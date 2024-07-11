@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+export const zNonNumString = z
+  .string({ message: "Genre must be a string." })
+  .refine((val) => !/\d/.test(val), {
+    message: "Genre should not contain numbers.",
+  });
+
 export const BookSchemaBase = z.object({
   title: z
     .string({ message: "Book title must be a string." })
@@ -10,13 +16,7 @@ export const BookSchemaBase = z.object({
   publisher: z
     .string({ message: "Publisher name must be a string." })
     .min(3, { message: "Publisher name must be minimum 3 characters long." }),
-  genre: z.array(
-    z
-      .string({ message: "Genre must be a string." })
-      .refine((val) => !/\d/.test(val), {
-        message: "Genre should not contain numbers.",
-      })
-  ),
+  genre: z.array(zNonNumString),
   isbnNo: z
     .string()
     .min(13, { message: "ISBN number must be 13 characters long." })
