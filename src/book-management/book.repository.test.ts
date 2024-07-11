@@ -1,4 +1,11 @@
-import { describe, test, expect, beforeEach, beforeAll } from "vitest";
+import {
+  describe,
+  test,
+  expect,
+  beforeEach,
+  beforeAll,
+  afterAll,
+} from "vitest";
 import { BookRepository } from "./book.repository";
 import { IBookBase, IBook } from "../models/book.model";
 import { Database, JsonAdapter } from "../database/db";
@@ -27,6 +34,9 @@ describe("BookRepository", () => {
       JsonAdapter<LibraryDataset>()
     );
     repository = new BookRepository(db);
+  });
+  afterAll(async () => {
+    await repository.reset();
   });
 
   beforeEach(async () => {

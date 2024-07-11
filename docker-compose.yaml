@@ -1,0 +1,30 @@
+version: "3"
+
+services:
+  lms_db:
+    image: mysql:latest
+    container_name: lms_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: library_db
+      MYSQL_USER: user
+      MYSQL_PASSWORD: user_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - dbdata:/var/lib/mysql
+  lms_pma:
+    image: phpmyadmin/phpmyadmin
+    container_name: lms_pma
+    restart: unless-stopped
+    links:
+      - lms_db
+    environment:
+      PMA_HOST: lms_db
+      PMA_PORT: 3306
+      # PMA_ARBITRARY: 1
+    ports:
+      - 8081:80
+volumes:
+  dbdata:

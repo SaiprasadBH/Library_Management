@@ -1,5 +1,5 @@
 import { IInteractor } from "../core/interactor";
-import { clearScreen, readChar, readLine } from "../core/input.utils";
+import { clearScreen, readChar, readLine } from "../libs/input.utils";
 import { BookRepository } from "./book.repository";
 import { IBook, IBookBase } from "../models/book.model";
 import {
@@ -12,9 +12,9 @@ import {
   printResult,
   printSubTitle,
   printTitle,
-} from "../core/output.utils";
+} from "../libs/output.utils";
 import { IPageRequest } from "../core/pagination";
-import { Menu } from "../core/menu";
+import { Menu } from "../libs/menu";
 import { Database } from "../database/db";
 import { ZodNumber, z } from "zod";
 import {

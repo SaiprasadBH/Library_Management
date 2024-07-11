@@ -11,6 +11,8 @@
   "license": "ISC",
   "dependencies": {
     "chalk": "^4.1.2",
+    "dotenv": "^16.4.5",
+    "mysql2": "^3.10.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.5.3",
     "zod": "^3.23.8"

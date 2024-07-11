@@ -1,5 +1,5 @@
 import { IInteractor } from "../core/interactor";
-import { clearScreen, readChar, readLine } from "../core/input.utils";
+import { clearScreen, readChar, readLine } from "../libs/input.utils";
 import { MemberRepository } from "./member.repository";
 import {
   enterButton,
@@ -11,9 +11,9 @@ import {
   printResult,
   printSubTitle,
   printTitle,
-} from "../core/output.utils";
+} from "../libs/output.utils";
 import { IPageRequest } from "../core/pagination";
-import { Menu } from "../core/menu";
+import { Menu } from "../libs/menu";
 import { Database } from "../database/db";
 import { IMember, IMemberBase, MemberSchema } from "../models/member.schema";
 import { ZodNumber, z } from "zod";

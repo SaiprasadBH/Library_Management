@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { clearScreen, readChar, readLine } from "../core/input.utils";
+import { clearScreen, readChar, readLine } from "../libs/input.utils";
 import { IInteractor } from "../core/interactor";
-import { Menu } from "../core/menu";
+import { Menu } from "../libs/menu";
 import {
   enterButton,
   printChoice,
@@ -12,7 +12,7 @@ import {
   printResult,
   printSubTitle,
   printTitle,
-} from "../core/output.utils";
+} from "../libs/output.utils";
 import { Database } from "../database/db";
 import { LibraryDataset } from "../database/library.dataset";
 import { ITransaction, ITransactionBase } from "../models/transaction.model";
@@ -245,38 +245,29 @@ async function issueBook(
   bookRepo: BookRepository,
   memberRepo: MemberRepository
 ) {
-  let issueMoreBooks = true;
-
-  while (issueMoreBooks) {
-    try {
-      const bookIssueData: ITransactionBase = await getIssueInput(
-        bookRepo,
-        memberRepo
-      );
-
-      const createdTransaction: ITransaction = await repo.create(bookIssueData);
-      if (createdTransaction) {
-        const book = await bookRepo.getById(createdTransaction.bookId);
-        const member = await memberRepo.getById(createdTransaction.memberId);
-        if (book && member) {
-          printHint("\nBook issue details:");
-          console.table({
-            "Book Title": book.title,
-            "Member Name": member.name,
-            "Issue Date": createdTransaction.dateOfIssue.toDateString(),
-            "Return Date": createdTransaction.dueDate.toDateString(),
-          });
-        }
-        printResult(`Book issued successfully.`);
-      }
-    } catch (error: unknown) {
-      if (error instanceof Error) console.log(error.message);
-    }
-
-    const continueIssuing = await readLine(
-      "Do you want to issue another book? (y/n): "
+  try {
+    const bookIssueData: ITransactionBase = await getIssueInput(
+      bookRepo,
+      memberRepo
     );
-    issueMoreBooks = continueIssuing.toLowerCase() === "y";
+
+    const createdTransaction: ITransaction = await repo.create(bookIssueData);
+    if (createdTransaction) {
+      const book = await bookRepo.getById(createdTransaction.bookId);
+      const member = await memberRepo.getById(createdTransaction.memberId);
+      if (book && member) {
+        printHint("\nBook issue details:");
+        console.table({
+          "Book Title": book.title,
+          "Member Name": member.name,
+          "Issue Date": createdTransaction.dateOfIssue.toDateString(),
+          "Return Date": createdTransaction.dueDate.toDateString(),
+        });
+      }
+      printResult(`Book issued successfully.`);
+    }
+  } catch (error: unknown) {
+    if (error instanceof Error) console.log(error.message);
   }
 
   printHint(`Press ${enterButton} to continue`);
@@ -289,45 +280,37 @@ async function returnBook(
   bookRepo: BookRepository,
   memberRepo: MemberRepository
 ) {
-  let returnMoreBooks = true;
-  while (returnMoreBooks) {
-    try {
-      const bookReturnData: ITransactionBase = await getReturnInput();
-      const transactions = await repo.list(`${bookReturnData.bookId}`);
-      const transaction = transactions.find((item) => {
-        return (
-          item.bookId === bookReturnData.bookId &&
-          item.memberId === bookReturnData.memberId &&
-          item.bookStatus === "issued"
-        );
-      });
+  try {
+    const bookReturnData: ITransactionBase = await getReturnInput();
+    const transactions = await repo.list(`${bookReturnData.bookId}`);
+    const transaction = transactions.find((item) => {
+      return (
+        item.bookId === bookReturnData.bookId &&
+        item.memberId === bookReturnData.memberId &&
+        item.bookStatus === "issued"
+      );
+    });
 
-      if (transaction) {
-        const id = transaction.id;
-        const deletedTransaction: ITransaction | null = await repo.delete(id);
-        if (deletedTransaction) {
-          const book = await bookRepo.getById(deletedTransaction.bookId);
-          const member = await memberRepo.getById(deletedTransaction.memberId);
-          if (book && member) {
-            printHint("\nBook return details:");
-            console.table({
-              "Book Title": book.title,
-              "Member Name": member.name,
-            });
-          }
-          printResult(`Book returned successfully.`);
+    if (transaction) {
+      const id = transaction.id;
+      const deletedTransaction: ITransaction | null = await repo.delete(id);
+      if (deletedTransaction) {
+        const book = await bookRepo.getById(deletedTransaction.bookId);
+        const member = await memberRepo.getById(deletedTransaction.memberId);
+        if (book && member) {
+          printHint("\nBook return details:");
+          console.table({
+            "Book Title": book.title,
+            "Member Name": member.name,
+          });
         }
-      } else {
-        throw new Error("Book already returned or Transaction does not exist");
+        printResult(`Book returned successfully.`);
       }
-    } catch (error: unknown) {
-      if (error instanceof Error) printError(error.message);
+    } else {
+      throw new Error("Book already returned or Transaction does not exist");
     }
-
-    const continueReturning = await readLine(
-      "Do you want to return another book? (y/n): "
-    );
-    returnMoreBooks = continueReturning.toLowerCase() === "y";
+  } catch (error: unknown) {
+    if (error instanceof Error) printError(error.message);
   }
 
   printHint(`Press ${enterButton} to continue`);

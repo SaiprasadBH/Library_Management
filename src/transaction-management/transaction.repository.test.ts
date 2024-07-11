@@ -89,7 +89,7 @@ describe("Testing transactions", () => {
 
   test("Attempting to delete a non-existent transaction", async () => {
     await expect(transactionRepo.delete(999)).rejects.toThrow(
-      "Transaction not found.\n Please enter correct transaction ID."
+      "Transaction not found. Please enter correct transaction ID."
     );
   });
 

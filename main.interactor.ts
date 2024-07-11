@@ -1,5 +1,5 @@
 import { IInteractor } from "./src/core/interactor";
-import { clearScreen, readChar, readLine } from "./src/core/input.utils";
+import { clearScreen, readChar, readLine } from "./src/libs/input.utils";
 import { BookInteractor } from "./src/book-management/book.interactor";
 import {
   enterButton,
@@ -8,8 +8,8 @@ import {
   printMenu,
   printPanel,
   printTitle,
-} from "./src/core/output.utils";
-import { Menu } from "./src/core/menu";
+} from "./src/libs/output.utils";
+import { Menu } from "./src/libs/menu";
 import { Database } from "./src/database/db";
 import { MemberInteractor } from "./src/member-management/member.interaction";
 import { LibraryDataset } from "./src/database/library.dataset";
