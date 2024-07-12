@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, test } from "vitest";
-import { MySQLAdapter } from "./sqldb";
+import { MySQLAdapter } from "./dbAdapter";
 import { AppEnvs } from "../core/read-env";
 import { SimpleWhereExpression } from "./dbTypes";
 import { IBook } from "../models/book.schema";
@@ -25,10 +25,12 @@ describe("mysql db adpter tests", () => {
 
     const selectAuthor = MySqlQueryGenerator.generateSelectSql<IBook>(
       "books_table",
-      ["author", "title"],
-      simpleWhereParam,
-      0,
-      10
+      {
+        fieldsToSelect: ["author", "title"],
+        where: simpleWhereParam,
+        offset: 0,
+        limit: 10,
+      }
     );
     const selectQueryResult = mySQLAdapter.runQuery(selectAuthor);
     console.log(selectQueryResult);

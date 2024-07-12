@@ -14,6 +14,8 @@ import { Database } from "./src/database/db";
 import { MemberInteractor } from "./src/member-management/member.interaction";
 import { LibraryDataset } from "./src/database/library.dataset";
 import { TransactionInteractor } from "./src/transaction-management/transaction.interaction";
+import { LibraryDB } from "./src/database/sqlDb";
+import { MockLibraryDataset } from "./src/database/mockLibrary.dataset";
 
 const menu = new Menu([
   { key: "1", label: "Book Management" },
@@ -52,6 +54,7 @@ export class LibraryInteractor implements IInteractor {
         await this.transactionInteractor.showMenu();
         break;
       case "4":
+        await sqlDb.shutdownPoolConnection();
         console.log("\n");
         printPanel("! ! ! Bye ! ! !");
         console.log("\n");
@@ -67,7 +70,9 @@ export class LibraryInteractor implements IInteractor {
 }
 
 // Initialize the database and pass it to LibraryInteractor
+
 const db = new Database<LibraryDataset>("database-files/db.json");
+const sqlDb = new LibraryDB<MockLibraryDataset>();
 const libManager = new LibraryInteractor(db);
 
 libManager.showMenu();

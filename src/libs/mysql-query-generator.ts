@@ -1,18 +1,20 @@
 import {
+  ColumnData,
+  ColumnSet,
+  WhereParam,
+  SimpleWhereExpression,
+  WhereExpression,
   AndWhereExpression,
   OrWhereExpression,
-  SimpleWhereExpression,
-  ColumnSet,
-  WhereExpression,
-  WhereParamValue,
 } from "../database/dbTypes";
+import { QueryConfig } from "./query-config.type";
 
 const generateWhereClauseSql = <T>(whereParams: WhereExpression<T>): string => {
   const processSimpleExp = (exp: SimpleWhereExpression<T>) => {
     const whereQuery = Object.entries(exp)
       .map(([key, opts]) => {
         const columnName = `\`${key}\``;
-        const paramValue: WhereParamValue = opts as WhereParamValue;
+        const paramValue = opts as WhereParam<T, keyof T>;
         let value = `${paramValue.value}`;
         let operator = "";
         if (paramValue.value === null) {
@@ -82,7 +84,7 @@ const generateWhereClauseSql = <T>(whereParams: WhereExpression<T>): string => {
         if (typeof paramValue.value === "string") {
           value = `"${value}"`;
         }
-        return `${columnName} ${operator} ${value}`;
+        return `${columnName}${operator}${value}`;
       })
       .join(" AND ");
     return whereQuery;
@@ -113,104 +115,108 @@ const generateWhereClauseSql = <T>(whereParams: WhereExpression<T>): string => {
     return simpleClause ? `(${simpleClause})` : "";
   }
 };
-const generateInsertSql = (tableName: string, row: ColumnSet): string => {
-  const columns = Object.keys(row)
-    .map((key) => `\`${key}\``)
-    .join(", ");
-  const values = Object.values(row)
-    .map((value) => {
-      if (typeof value === "string") {
-        return `"${value}"`;
-      } else {
-        return `${value}`;
-      }
-    })
-    .join(", ");
 
-  const sql = `INSERT INTO \`${tableName}\` (${columns}) VALUES (${values})`;
-
-  return sql;
-};
-
-const generateUpdateSql = <T>(
+const generateInsertSql = <Model>(
   tableName: string,
-  row: ColumnSet,
-  where: WhereExpression<T>
+  row: ColumnSet<Model>
 ): string => {
-  let sql = `UPDATE \`${tableName}\` SET `;
+  let columns = "";
+  let values = "";
 
-  const setClauses = Object.entries(row).map(([key, value]) => {
+  Object.entries(row).forEach(([key, data]) => {
+    const value = data as ColumnData<Model, keyof Model>;
+    if (columns) columns += ", ";
+    columns += `\`${key}\``;
+
+    if (values) values += ", ";
     if (typeof value === "string") {
-      return `\`${key}\` = "${value}"`;
+      values += `"${value}"`;
     } else {
-      return `\`${key}\` = ${value}`;
+      values += `${value}`;
     }
   });
 
-  sql += setClauses.join(", ");
+  let sql = `INSERT INTO \`${tableName}\` (${columns}) VALUES (${values})`;
 
-  const whereClause = generateWhereClauseSql(where);
-  if (whereClause) {
+  return sql;
+};
+
+const generateUpdateSql = <Model>(
+  tableName: string,
+  row: ColumnSet<Model>,
+  where: WhereExpression<Model>
+): string => {
+  const setClause = Object.entries(row)
+    .map(([key, newValue]) => {
+      const value = newValue as ColumnData<Model, keyof Model>;
+      const columnName = `\`${key}\``;
+      let formattedValue =
+        typeof value === "string" ? `"${value}"` : `${value}`;
+      return `${columnName} = ${formattedValue}`;
+    })
+    .join(", ");
+
+  let sql = `UPDATE ${tableName} SET ${setClause}`;
+
+  if (Object.keys(where).length !== 0) {
+    const whereClause = generateWhereClauseSql<Model>(where);
     sql += ` WHERE ${whereClause}`;
-  } else {
-    throw new Error("WHERE condition for UPDATE missing");
   }
 
   return sql;
 };
 
-const generateDeleteSql = <T>(
+const generateDeleteSql = <Model>(
   tableName: string,
-  where: WhereExpression<T>
+  where: WhereExpression<Model>
 ): string => {
-  let sql = `DELETE FROM \`${tableName}\``;
-  const whereClause = generateWhereClauseSql<T>(where);
-  if (whereClause) {
+  let sql: string = `DELETE FROM ${tableName}`;
+  if (Object.keys(where).length !== 0) {
+    const whereClause = generateWhereClauseSql<Model>(where);
+    sql += ` WHERE ${whereClause}`;
+  }
+  return sql;
+};
+
+const generateSelectSql = <Model>(
+  tableName: string,
+  selectConfig?: QueryConfig<Model>
+): string => {
+  let sql: string = `SELECT * FROM \`${tableName}\``;
+  if (selectConfig) {
+    if (selectConfig.fieldsToSelect) {
+      const fieldsToSelect = selectConfig.fieldsToSelect.map((field) => {
+        let sanitisedField = String(field);
+        sanitisedField = sanitisedField.startsWith("`")
+          ? sanitisedField
+          : "`" + sanitisedField;
+        sanitisedField += sanitisedField.endsWith("`") ? sanitisedField : "`";
+        return sanitisedField;
+      });
+
+      sql = `SELECT ${fieldsToSelect.join(", ")} FROM \`${tableName}\``;
+    }
+    if (selectConfig.where && Object.keys(selectConfig.where).length !== 0) {
+      const whereClause = generateWhereClauseSql(selectConfig.where);
+      sql += ` WHERE ${whereClause}`;
+    }
+    if (selectConfig.limit) sql += ` LIMIT ${selectConfig.limit}`;
+    if (selectConfig.offset) sql += ` OFFSET ${selectConfig.offset}`;
+  }
+  return sql;
+};
+
+const generateCountSql = <Model>(
+  tableName: string,
+  where?: WhereExpression<Model>
+): string => {
+  let sql = `SELECT COUNT(*) AS \`count\` FROM ${tableName}`;
+
+  if (where && Object.keys(where).length !== 0) {
+    const whereClause = generateWhereClauseSql(where);
     sql += ` WHERE ${whereClause}`;
   }
 
-  return sql;
-};
-
-const generateSelectSql = <T>(
-  tableName: string,
-  columns: Array<keyof Partial<T>>,
-  where: WhereExpression<T>,
-  offset: number,
-  limit: number
-): string => {
-  const sanitizedColumns = columns?.map((column) => {
-    //TODO need to modify here to check if there's only a trailing backtick
-    return (column as string).startsWith("`")
-      ? column
-      : "`" + (column as string) + "`";
-  });
-  let sql = `SELECT`;
-  let columnString;
-  if (columns.length > 0) {
-    columnString = sanitizedColumns.join(",");
-  } else {
-    columnString = "*";
-  }
-  sql += ` ${columnString} FROM \`${tableName}\``;
-
-  const whereClause = generateWhereClauseSql(where);
-  if (whereClause) {
-    sql += ` WHERE ${whereClause} `;
-  }
-
-  sql += ` LIMIT ${limit} OFFSET ${offset}`;
-  return sql;
-};
-const generateCountSql = <T>(
-  tableName: string,
-  where: WhereExpression<T>
-): string => {
-  let sql = `SELECT COUNT(*) FROM \`${tableName}\``;
-  const whereClause = generateWhereClauseSql(where);
-  if (whereClause) {
-    sql += ` WHERE ${whereClause} `;
-  }
   return sql;
 };
 

@@ -1,3 +1,6 @@
+import { clearScreen } from "./input.utils";
+import { printTitle } from "./output.utils";
+
 export interface IMenuItem {
   key: string;
   label: string;
@@ -22,4 +25,18 @@ export class Menu {
   getItem(key: string): IMenuItem | null {
     return this.items.find((item) => item.key === key) || null;
   }
+
+  updateFrame() {
+    clearScreen();
+    printTitle();
+    this.serialize();
+  }
+
+  show(subTitle: string) {
+    this.updateFrame();
+  }
+}
+
+interface UpdateFrameI {
+  subTitle?: string;
 }

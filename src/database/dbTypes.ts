@@ -1,5 +1,5 @@
-export type ColumnData = string | number | boolean | null;
-export type ColumnSet = Record<string, ColumnData>;
+export type ColumnData<T, K extends keyof T> = T[K];
+export type ColumnSet<T> = { [K in keyof Partial<T>]: ColumnData<T, K> };
 
 export type StringOperator =
   | "EQUALS"
@@ -36,15 +36,16 @@ export type BooleanOperatorParam = {
   value: boolean | null;
 };
 
-export type WhereParamValue =
-  | StringOperatorParam
-  | NumberOperatorParam
-  | BooleanOperatorParam;
-
-export type PageOption = {
-  offset?: number;
-  limit?: number;
+export type WhereParam<Model, Key extends keyof Model> = {
+  op: Model[Key] extends number
+    ? NumberOperator
+    : Model[Key] extends string
+      ? StringOperator
+      : BooleanOperator;
+  value: Model[Key] | null;
 };
+
+// export type WhereClause<T> = { [K in keyof Partial<T>]: WhereParam<T, K> };
 
 export type WhereExpression<CompleteModel> =
   | SimpleWhereExpression<CompleteModel>
@@ -52,7 +53,7 @@ export type WhereExpression<CompleteModel> =
   | AndWhereExpression<CompleteModel>;
 
 export type SimpleWhereExpression<CompleteModel> = {
-  [key in keyof Partial<CompleteModel>]: WhereParamValue;
+  [key in keyof Partial<CompleteModel>]: WhereParam<CompleteModel, key>;
 };
 
 export type OrWhereExpression<CompleteModel> = {
