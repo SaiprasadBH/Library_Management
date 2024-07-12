@@ -10,9 +10,8 @@ describe("mysql db adpter tests", () => {
   let mySQLAdapter: MySQLAdapter;
   beforeAll(async () => {
     mySQLAdapter = new MySQLAdapter({
-      dbURL: AppEnvs.DBURL,
+      dbURL: AppEnvs.DATABASE_URL,
     });
-    await mySQLAdapter.load();
   });
 
   test("run a select on books table", async () => {

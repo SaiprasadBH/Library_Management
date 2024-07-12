@@ -200,8 +200,9 @@ const generateSelectSql = <Model>(
       const whereClause = generateWhereClauseSql(selectConfig.where);
       sql += ` WHERE ${whereClause}`;
     }
-    if (selectConfig.limit) sql += ` LIMIT ${selectConfig.limit}`;
-    if (selectConfig.offset) sql += ` OFFSET ${selectConfig.offset}`;
+    if (selectConfig.limit !== undefined) sql += ` LIMIT ${selectConfig.limit}`;
+    if (selectConfig.offset !== undefined)
+      sql += ` OFFSET ${selectConfig.offset}`;
   }
   return sql;
 };
