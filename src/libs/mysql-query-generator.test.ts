@@ -18,10 +18,11 @@ describe("second set of tests", () => {
         value: "Sudha moorthy",
       },
     };
-    const simpleWhere: string =
+    const [simpleWhere, data]: [string, unknown[]] =
       MySqlQueryGenerator.generateWhereClauseSql<IBook>(simpleWhereParam);
 
-    expect(simpleWhere).toEqual('(`author` LIKE "%Sudha moorthy%")');
+    expect(simpleWhere).toEqual("(`author` LIKE ?)");
+    expect(data).toEqual(["%Sudha moorthy%"]);
   });
 
   test("OrWhereExpression test", () => {
@@ -41,11 +42,12 @@ describe("second set of tests", () => {
         },
       ],
     };
-    expect(
-      MySqlQueryGenerator.generateWhereClauseSql<IBook>(OrWhereExpressionParam)
-    ).toEqual(
-      '((`author` LIKE "%Sudha moorthy%") OR (`totalNumOfCopies` >= 10))'
+
+    const [query, data] = MySqlQueryGenerator.generateWhereClauseSql<IBook>(
+      OrWhereExpressionParam
     );
+    expect(query).toEqual("((`author` LIKE ?) OR (`totalNumOfCopies` >= ?))");
+    expect(data).toEqual(["%Sudha moorthy%", "10"]);
   });
 
   test("AndWhereExpression test", () => {
@@ -65,13 +67,12 @@ describe("second set of tests", () => {
         },
       ],
     };
-    expect(
-      MySqlQueryGenerator.generateWhereClauseSql<IBook>(
-        andWhereExpressionParams
-      )
-    ).toEqual(
-      '((`author` LIKE "%Sudha moorthy%") AND (`totalNumOfCopies` >= 10))'
+
+    const [query, data] = MySqlQueryGenerator.generateWhereClauseSql<IBook>(
+      andWhereExpressionParams
     );
+    expect(query).toEqual("((`author` LIKE ?) AND (`totalNumOfCopies` >= ?))");
+    expect(data).toEqual(["%Sudha moorthy%", "10"]);
   });
 
   test("Nested OR and And Where Clauses test", () => {
@@ -101,11 +102,12 @@ describe("second set of tests", () => {
         },
       ],
     };
-    expect(
-      MySqlQueryGenerator.generateWhereClauseSql(WhereExpressionParam)
-    ).toEqual(
-      '(((`author` LIKE "%Sudha moorthy%") OR (`totalNumOfCopies` >= 10)) AND (`publisher` LIKE "%Penguin UK%"))'
+    const [query, data] =
+      MySqlQueryGenerator.generateWhereClauseSql(WhereExpressionParam);
+    expect(query).toEqual(
+      "(((`author` LIKE ?) OR (`totalNumOfCopies` >= ?)) AND (`publisher` LIKE ?))"
     );
+    expect(data).toEqual(["%Sudha moorthy%", "10", "%Penguin UK%"]);
   });
 
   test("select query test", () => {
@@ -115,7 +117,7 @@ describe("second set of tests", () => {
         value: "Sudha moorthy",
       },
     };
-    const selectAuthor = MySqlQueryGenerator.generateSelectSql<IBook>(
+    const [selectAuthor, data] = MySqlQueryGenerator.generateSelectSql<IBook>(
       "books_table",
       {
         fieldsToSelect: ["author", "title"],
@@ -125,7 +127,8 @@ describe("second set of tests", () => {
       }
     );
     expect(selectAuthor).toEqual(
-      'SELECT `author`, `title` FROM `books_table` WHERE (`author` LIKE "%Sudha moorthy%") LIMIT 100 OFFSET 0'
+      "SELECT `author`, `title` FROM `books_table` WHERE (`author` LIKE ?) LIMIT 100 OFFSET 0"
     );
+    expect(data).toEqual(["%Sudha moorthy%"]);
   });
 });

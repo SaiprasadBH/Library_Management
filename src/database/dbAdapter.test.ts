@@ -8,22 +8,27 @@ import { MySqlQueryGenerator } from "../libs/mysql-query-generator";
 
 describe("mysql db adpter tests", () => {
   let mySQLAdapter: MySQLAdapter;
+
   beforeAll(async () => {
     mySQLAdapter = new MySQLAdapter({
       dbURL: AppEnvs.DATABASE_URL,
     });
   });
 
+  afterAll(() => {
+    mySQLAdapter.shutdown();
+  });
+
   test("run a select on books table", async () => {
     const simpleWhereParam: SimpleWhereExpression<IBook> = {
       author: {
         op: "CONTAINS",
-        value: "Sudha moorthy",
+        value: "Sudha Murthy",
       },
     };
 
-    const selectAuthor = MySqlQueryGenerator.generateSelectSql<IBook>(
-      "books_table",
+    const [selectAuthor, data] = MySqlQueryGenerator.generateSelectSql<IBook>(
+      "books",
       {
         fieldsToSelect: ["author", "title"],
         where: simpleWhereParam,
@@ -31,10 +36,7 @@ describe("mysql db adpter tests", () => {
         limit: 10,
       }
     );
-    const selectQueryResult = mySQLAdapter.runQuery(selectAuthor);
-    console.log(selectQueryResult);
-  });
-  afterAll(() => {
-    mySQLAdapter.shutdown();
+    const selectQueryResult = await mySQLAdapter.runQuery(selectAuthor, data);
+    console.table(selectQueryResult);
   });
 });

@@ -1,16 +1,15 @@
-import { MySQLAdapter } from "./dbAdapter";
-import { MySqlQueryGenerator } from "../libs/mysql-query-generator";
-import { ColumnSet, WhereExpression } from "./dbTypes";
 import mysql from "mysql2/promise";
+import { ColumnSet, WhereExpression } from "./dbTypes";
+import { MySqlQueryGenerator } from "../libs/mysql-query-generator";
+import { MySQLAdapter } from "./dbAdapter";
 import { QueryConfig } from "../libs/query-config.type";
-import { isBuffer } from "util";
 
 interface IDatabase {
-  create<T>(
+  insert<T>(
     tableName: string,
     data: ColumnSet<T>
   ): Promise<mysql.QueryResult | null>;
-  read<T>(
+  select<T>(
     tableName: string,
     queryConfig?: QueryConfig<T>
   ): Promise<mysql.QueryResult | null>;
@@ -25,28 +24,33 @@ interface IDatabase {
   ): Promise<mysql.QueryResult | null>;
 }
 
-export class LibraryDb implements IDatabase {
+export class MySQLDatabase implements IDatabase {
   constructor(private readonly adapter: MySQLAdapter) {}
 
-  async create<T>(
+  async insert<T>(
     tableName: string,
     data: ColumnSet<T>
   ): Promise<mysql.QueryResult | null> {
-    const query = MySqlQueryGenerator.generateInsertSql(tableName, data);
-    const results = await this.adapter.runQuery(query);
+    const [query, values] = MySqlQueryGenerator.generateInsertSql(
+      tableName,
+      data
+    );
+    const results = await this.adapter.runQuery(query, values);
     if (results) {
       return results;
     }
     return null;
   }
 
-  async read<T>(
+  async select<T>(
     tableName: string,
     queryConfig?: QueryConfig<T>
   ): Promise<mysql.QueryResult | null> {
-    const query = MySqlQueryGenerator.generateSelectSql(tableName, queryConfig);
-    console.log(query);
-    const results = await this.adapter.runQuery(query);
+    const [query, values] = MySqlQueryGenerator.generateSelectSql(
+      tableName,
+      queryConfig
+    );
+    const results = await this.adapter.runQuery(query, values);
     if (results) {
       return results;
     }
@@ -58,8 +62,12 @@ export class LibraryDb implements IDatabase {
     data: ColumnSet<T>,
     where: WhereExpression<T>
   ): Promise<mysql.QueryResult | null> {
-    const query = MySqlQueryGenerator.generateUpdateSql(tableName, data, where);
-    const results = await this.adapter.runQuery(query);
+    const [query, values] = MySqlQueryGenerator.generateUpdateSql(
+      tableName,
+      data,
+      where
+    );
+    const results = await this.adapter.runQuery(query, values);
     if (results) {
       return results;
     }
@@ -70,8 +78,11 @@ export class LibraryDb implements IDatabase {
     tableName: string,
     where: WhereExpression<T>
   ): Promise<mysql.QueryResult | null> {
-    const query = MySqlQueryGenerator.generateDeleteSql(tableName, where);
-    const results = await this.adapter.runQuery(query);
+    const [query, values] = MySqlQueryGenerator.generateDeleteSql(
+      tableName,
+      where
+    );
+    const results = await this.adapter.runQuery(query, values);
     if (results) {
       return results;
     }

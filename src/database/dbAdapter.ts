@@ -1,5 +1,4 @@
 // this layer needs to be initialized in the main.interactor.
-
 import mysql from "mysql2/promise";
 import "dotenv/config";
 
@@ -7,15 +6,16 @@ import "dotenv/config";
  * This is the config object that must be passed to create the MySQLAdapter.
  */
 interface DBConfig {
-  /**
-   * The complete url to the database with user_name, password, host, port and database name.
-   */
+  // The complete url to the database with user_name, password, host, port and database name.
   dbURL: string;
 }
 
 interface Adapter {
   shutdown: () => Promise<void>;
-  runQuery: (query: string) => Promise<mysql.QueryResult | undefined>;
+  runQuery: (
+    query: string,
+    data: unknown[]
+  ) => Promise<mysql.QueryResult | undefined>;
 }
 
 export class MySQLAdapter implements Adapter {
@@ -29,11 +29,14 @@ export class MySQLAdapter implements Adapter {
     return this.pool.end();
   }
 
-  async runQuery(query: string): Promise<mysql.QueryResult | undefined> {
+  async runQuery(
+    query: string,
+    data: unknown[]
+  ): Promise<mysql.QueryResult | undefined> {
     let connection: mysql.PoolConnection | null = null;
     try {
       const connection = await this.pool.getConnection();
-      const [result] = await connection.query(query);
+      const [result] = await connection.query(query, data);
       return result;
     } catch (err) {
       if (err instanceof Error) {
