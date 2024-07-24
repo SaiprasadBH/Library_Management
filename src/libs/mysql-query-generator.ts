@@ -1,11 +1,13 @@
 import {
   ColumnData,
   ColumnSet,
-  WhereParam,
+  WhereParamValue,
   SimpleWhereExpression,
   WhereExpression,
   AndWhereExpression,
   OrWhereExpression,
+  NestedQuery,
+  WhereParam,
 } from "../database/dbTypes";
 import { QueryConfig } from "./query-config.type";
 
@@ -18,14 +20,31 @@ const generateWhereClauseSql = <T>(
       .map(([key, opts]) => {
         const columnName = `\`${key}\``;
         const paramValue = opts as WhereParam<T, keyof T>;
-        let value = `${paramValue.value}`;
+        let value =
+          typeof paramValue.value === "string"
+            ? `${paramValue.value}`
+            : paramValue.value;
         let operator = "";
-        if (paramValue.value === null) {
-          if (paramValue.op === "EQUALS") {
-            operator = " IS ";
-          } else {
-            operator = " IS NOT ";
+
+        if (value === null) {
+          operator = paramValue.op === "EQUALS" ? " IS " : " IS NOT ";
+        } else if (Array.isArray(value)) {
+          if (paramValue.op === "IN" || paramValue.op === "NOT_IN") {
+            operator = paramValue.op === "IN" ? " IN " : " NOT IN ";
+            data.push(...value);
+            const placeholders = value.map(() => "?").join(", ");
+
+            return `${columnName}${operator}(${placeholders})`;
           }
+        } else if (typeof value === "object" && "tableName" in value) {
+          const [nestedQuery, nestedData] = generateSelectSql(
+            value.tableName,
+            value
+          );
+          operator = paramValue.op === "IN" ? " IN " : " NOT IN ";
+          data.push(...nestedData);
+
+          return `${columnName}${operator}(${nestedQuery})`;
         } else {
           switch (paramValue.op) {
             case "EQUALS":
@@ -139,8 +158,6 @@ const generateInsertSql = <Model>(
   });
 
   const sql = `INSERT INTO \`${tableName}\` (${columns.join(", ")}) VALUES (${placeholders.join(", ")})`;
-  console.log(sql);
-  console.log(values);
   return [sql, values];
 };
 
@@ -163,8 +180,6 @@ const generateUpdateSql = <Model>(
     sql += ` WHERE ${whereClause}`;
     values.push(...whereData);
   }
-  console.log(sql);
-  console.log(values);
   return [sql, values];
 };
 
@@ -180,8 +195,6 @@ const generateDeleteSql = <Model>(
     sql += ` WHERE ${whereClause}`;
     values.push(...whereData);
   }
-  console.log(sql);
-  console.log(values);
   return [sql, values];
 };
 
@@ -207,7 +220,6 @@ const generateSelectSql = <Model>(
       );
       sql = `SELECT ${fieldsToSelect.join(", ")} FROM \`${tableName}\``;
     }
-
     if (selectConfig.where && Object.keys(selectConfig.where).length !== 0) {
       const [whereClause, whereData] = generateWhereClauseSql(
         selectConfig.where
@@ -219,8 +231,6 @@ const generateSelectSql = <Model>(
     if (selectConfig.offset !== undefined)
       sql += ` OFFSET ${selectConfig.offset}`;
   }
-  console.log(sql);
-  console.log(values);
   return [sql, values];
 };
 
@@ -236,8 +246,6 @@ const generateCountSql = <Model>(
     sql += ` WHERE ${whereClause}`;
     values.push(...whereData);
   }
-  console.log(sql);
-  console.log(values);
   return [sql, values];
 };
 

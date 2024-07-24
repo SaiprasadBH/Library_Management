@@ -1,5 +1,6 @@
-export type ColumnData<T, K extends keyof T> = T[K];
-export type ColumnSet<T> = { [K in keyof Partial<T>]: ColumnData<T, K> };
+export type ColumnData = string | number | boolean | null;
+export type ColumnSet<T> = Omit<T, "id">;
+export type UpdateColumnSet<T> = Partial<ColumnSet<T>>;
 
 export type StringOperator =
   | "EQUALS"
@@ -20,6 +21,7 @@ export type NumberOperator =
   | "LESSER_THAN_EQUALS";
 
 export type BooleanOperator = "EQUALS" | "NOT_EQUALS";
+export type VectorOperator = "IN" | "NOT_IN";
 
 export type StringOperatorParam = {
   op: StringOperator;
@@ -36,29 +38,65 @@ export type BooleanOperatorParam = {
   value: boolean | null;
 };
 
-export type WhereParam<Model, Key extends keyof Model> = {
-  op: Model[Key] extends number
-    ? NumberOperator
-    : Model[Key] extends string
-      ? StringOperator
-      : BooleanOperator;
-  value: Model[Key] | null;
+export type VectorOperatorParam<CompleteModel> = {
+  op: VectorOperator;
+  value: ColumnData[] | NestedQuery<CompleteModel>;
 };
 
-// export type WhereClause<T> = { [K in keyof Partial<T>]: WhereParam<T, K> };
+export type PageOption = {
+  offset?: number;
+  limit?: number;
+};
+
+export type WhereParamValue<CompleteModel> =
+  | StringOperatorParam
+  | NumberOperatorParam
+  | BooleanOperatorParam
+  | VectorOperatorParam<CompleteModel>;
+
+export type WhereParam<Model, Key extends keyof Model> = {
+  op: Model[Key] extends number
+    ? NumberOperator | VectorOperator
+    : Model[Key] extends string
+      ? StringOperator | VectorOperator
+      : BooleanOperator;
+  value: Model[Key] | Array<Model[Key]> | NestedQuery<Model> | null;
+};
+
+export type SimpleWhereExpression<CompleteModel> = {
+  [key in keyof Partial<CompleteModel>]: WhereParamValue<CompleteModel>;
+};
+
+export type OrWhereExpression<CompleteModel> = {
+  OR: WhereExpression<CompleteModel>[];
+};
+
+export type AndWhereExpression<CompleteModel> = {
+  AND: WhereExpression<CompleteModel>[];
+};
 
 export type WhereExpression<CompleteModel> =
   | SimpleWhereExpression<CompleteModel>
   | OrWhereExpression<CompleteModel>
   | AndWhereExpression<CompleteModel>;
 
-export type SimpleWhereExpression<CompleteModel> = {
-  [key in keyof Partial<CompleteModel>]: WhereParam<CompleteModel, key>;
-};
+export interface Query {
+  sql: string;
+  data: ColumnData[];
+}
 
-export type OrWhereExpression<CompleteModel> = {
-  OR: WhereExpression<CompleteModel>[];
-};
-export type AndWhereExpression<CompleteModel> = {
-  AND: WhereExpression<CompleteModel>[];
-};
+export interface NestedQuery<CompleteModel> {
+  tableName: string;
+  fieldsToSelect?: Array<keyof Partial<CompleteModel>>;
+  where: WhereExpression<CompleteModel>;
+  offset?: number;
+  limit?: number;
+}
+
+/**
+ * This is the config object that must be passed to create the MySQLAdapter.
+ */
+export interface DBConfig {
+  // The complete url to the database with user_name, password, host, port and database name.
+  dbURL: string;
+}

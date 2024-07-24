@@ -3,16 +3,17 @@ import { ColumnSet, WhereExpression } from "./dbTypes";
 import { MySqlQueryGenerator } from "../libs/mysql-query-generator";
 import { MySQLAdapter } from "./dbAdapter";
 import { QueryConfig } from "../libs/query-config.type";
+import { IBook } from "../models/book.schema";
 
 interface IDatabase {
   insert<T>(
     tableName: string,
     data: ColumnSet<T>
-  ): Promise<mysql.QueryResult | null>;
+  ): Promise<mysql.ResultSetHeader | null>;
   select<T>(
     tableName: string,
     queryConfig?: QueryConfig<T>
-  ): Promise<mysql.QueryResult | null>;
+  ): Promise<mysql.RowDataPacket | mysql.RowDataPacket[] | null>;
   update<T>(
     tableName: string,
     data: ColumnSet<T>,
@@ -30,14 +31,15 @@ export class MySQLDatabase implements IDatabase {
   async insert<T>(
     tableName: string,
     data: ColumnSet<T>
-  ): Promise<mysql.QueryResult | null> {
+  ): Promise<mysql.ResultSetHeader | null> {
     const [query, values] = MySqlQueryGenerator.generateInsertSql(
       tableName,
       data
     );
     const results = await this.adapter.runQuery(query, values);
+
     if (results) {
-      return results;
+      return results as mysql.ResultSetHeader;
     }
     return null;
   }
@@ -45,12 +47,15 @@ export class MySQLDatabase implements IDatabase {
   async select<T>(
     tableName: string,
     queryConfig?: QueryConfig<T>
-  ): Promise<mysql.QueryResult | null> {
+  ): Promise<mysql.RowDataPacket | mysql.RowDataPacket[] | null> {
     const [query, values] = MySqlQueryGenerator.generateSelectSql(
       tableName,
       queryConfig
     );
-    const results = await this.adapter.runQuery(query, values);
+    const results = (await this.adapter.runQuery(
+      query,
+      values
+    )) as mysql.RowDataPacket;
     if (results) {
       return results;
     }

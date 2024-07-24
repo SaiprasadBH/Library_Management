@@ -37,6 +37,6 @@ describe("mysql db adpter tests", () => {
       }
     );
     const selectQueryResult = await mySQLAdapter.runQuery(selectAuthor, data);
-    console.table(selectQueryResult);
+    // console.table(selectQueryResult);
   });
 });

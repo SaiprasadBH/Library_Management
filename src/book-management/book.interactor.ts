@@ -22,7 +22,8 @@ import {
   BookSchemaBase,
   zNonNumString,
 } from "../models/book.schema";
-import { LibraryDataset } from "../database/library.dataset";
+import { MySQLDatabase } from "../database/libraryDb";
+import { MySqlConnectionFactory } from "../database/dbConnection";
 
 const menu = new Menu([
   { key: "1", label: "Add a Book" },
@@ -34,8 +35,8 @@ const menu = new Menu([
 export class BookInteractor implements IInteractor {
   private repo: BookRepository;
 
-  constructor(db: Database<LibraryDataset>) {
-    this.repo = new BookRepository(db);
+  constructor(connFactory: MySqlConnectionFactory) {
+    this.repo = new BookRepository(connFactory);
   }
 
   async showMenu(): Promise<void> {
@@ -85,7 +86,7 @@ const checkInt = async (value: string | number): Promise<number> => {
   return checkInt(await readLine("Enter again: "));
 };
 
-//////////////////// Depricated
+/////////// Depricated
 const getNonEmptyInput = async (question: string): Promise<string> => {
   const answer = await readLine(question);
   if (answer.trim() !== "") {
@@ -151,9 +152,9 @@ async function getBookInput(existingBook?: IBookBase): Promise<IBookBase> {
   let genre = await validateInput<string>(
     "Enter genre: ",
     zNonNumString,
-    existingBook?.genre?.join(", ")
+    existingBook?.genre
   );
-  const genreArray = genre.split(",").map((g) => g.trim());
+
   //await validateInput("Enter genre: ", bookSchema.shape.genre, genreArray);
   const isbnNo = await validateInput<string>(
     "Enter ISB number: ",
@@ -175,7 +176,7 @@ async function getBookInput(existingBook?: IBookBase): Promise<IBookBase> {
     title,
     author,
     publisher,
-    genre: genreArray,
+    genre,
     isbnNo,
     numOfPages,
     totalNumOfCopies,
@@ -204,16 +205,20 @@ async function editBook(repo: BookRepository) {
     BookSchema.shape.id
   );
   const existingBook = await repo.getById(bookId);
-  if (!existingBook) {
-    printError("Book not found");
-  } else {
-    printHint(
-      `Press ${enterButton} if you don't want to change the current property.\n`
-    );
-    const updatedData = await getBookInput(existingBook);
-    const updatedBook = await repo.update(existingBook.id, updatedData);
-    printResult("Book updated successfully");
-    displayPage(updatedBook);
+  try {
+    if (!existingBook) {
+      printError("Book not found");
+    } else {
+      printHint(
+        `Press ${enterButton} if you don't want to change the current property.\n`
+      );
+      const updatedData = await getBookInput(existingBook);
+      const updatedBook = await repo.update(existingBook.id, updatedData);
+      printResult("Book updated successfully");
+      displayPage(updatedBook);
+    }
+  } catch (error) {
+    if (error instanceof Error) console.log(error.message);
   }
   printHint(`Press ${enterButton} to continue`);
   await readLine("");
@@ -289,13 +294,16 @@ async function searchForBook(repo: BookRepository) {
     await readLine("Enter limit: ", defaultLimit.toString())
   );
   const pageRequest: IPageRequest = { offset, limit };
-
-  const searchResultItems = await repo.list(searchText);
-  if (searchResultItems.length === 0) {
+  try {
+    const searchResultItems = await repo.list(searchText);
+    if (searchResultItems.length === 0) {
+      printError("No match found");
+    } else {
+      const currPage = searchResultItems.slice(offset, limit);
+      await loadPage(currPage, pageRequest, searchResultItems, searchText);
+    }
+  } catch (e) {
     printError("No match found");
-  } else {
-    const currPage = searchResultItems.slice(offset, limit);
-    await loadPage(currPage, pageRequest, searchResultItems, searchText);
   }
   return;
 }

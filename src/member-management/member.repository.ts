@@ -1,78 +1,206 @@
-import { IPageRequest, IPagedResponse } from "../core/pagination";
 import { IRepository } from "../core/repository";
-import {
-  IMember,
-  IMemberBase,
-  MemberBaseSchema,
-} from "../models/member.schema";
-import { Database } from "../database/db";
-import { LibraryDataset } from "../database/library.dataset";
+import { IMember } from "../models/member.model";
+import { MemberBaseSchema, IMemberBase } from "../models/member.schema";
+import { MySqlConnectionFactory } from "../database/dbConnection";
+import { QueryResult } from "mysql2/promise";
+import { WhereExpression } from "../database/dbTypes";
+import { MySqlQueryGenerator } from "../libs/mysql-query-generator";
+import mysql from "mysql2/promise";
 
 export class MemberRepository implements IRepository<IMemberBase, IMember> {
-  private tableName: string = "members";
-
-  constructor(private readonly db: Database<LibraryDataset>) {}
+  constructor(private readonly dbConnectionFactory: MySqlConnectionFactory) {}
 
   async create(data: IMemberBase): Promise<IMember> {
     const validatedData = MemberBaseSchema.parse(data);
-    const members = this.db.table("members");
 
-    const newMember: IMember = {
+    const newMember: Omit<IMember, "id"> = {
       ...validatedData,
-      id: members.length + 1,
     };
-    members.push(newMember);
-    await this.db.save();
-    return newMember;
+
+    const connection = await this.dbConnectionFactory.acquirePoolConnection();
+
+    try {
+      await connection.initialize();
+      const [query, values] = MySqlQueryGenerator.generateInsertSql<IMember>(
+        "members",
+        newMember
+      );
+      const result = (await connection.query<QueryResult>(
+        query,
+        values
+      )) as mysql.ResultSetHeader;
+
+      const insertId = result.insertId;
+      return await this.getById(insertId);
+    } catch (e) {
+      throw new Error("Member creation failed.");
+    } finally {
+      await connection.release();
+    }
   }
 
   async update(id: number, data: IMemberBase): Promise<IMember> {
-    const members = this.db.table("members");
-    const index = members.findIndex((member) => member.id === id);
+    const memberToUpdate = await this.getById(id);
+    if (!memberToUpdate) {
+      throw new Error("Member not found");
+    }
 
-    const parsedData = MemberBaseSchema.parse(data);
-
-    const updatedMember = {
-      ...members[index],
-      ...parsedData,
+    const validatedData = MemberBaseSchema.parse(data);
+    const updatedMember: IMember = {
+      ...memberToUpdate,
+      ...validatedData,
     };
-    members[index] = updatedMember;
-    await this.db.save();
-    return updatedMember;
+
+    const whereCondition: WhereExpression<IMember> = {
+      id: {
+        op: "EQUALS",
+        value: id,
+      },
+    };
+
+    const connection = await this.dbConnectionFactory.acquirePoolConnection();
+    try {
+      await connection.initialize();
+      const [query, values] = MySqlQueryGenerator.generateUpdateSql(
+        "members",
+        updatedMember,
+        whereCondition
+      );
+
+      const result = (await connection.query<QueryResult>(
+        query,
+        values
+      )) as mysql.ResultSetHeader;
+
+      if (result.affectedRows > 0) {
+        return updatedMember;
+      } else {
+        throw new Error("Failed to update member");
+      }
+    } catch (e) {
+      throw new Error("Member creation failed.");
+    } finally {
+      await connection.release();
+    }
   }
 
   async delete(id: number): Promise<IMember | null> {
-    const members = this.db.table("members");
-    const index = members.findIndex((member) => member.id === id);
-    if (index !== -1) {
-      const [deletedMember] = members.splice(index, 1);
-      await this.db.save();
-      return deletedMember;
+    const memberToDelete = await this.getById(id);
+    if (!memberToDelete) {
+      throw new Error("Member not found");
     }
-    return null;
+
+    const whereCondition: WhereExpression<IMember> = {
+      id: {
+        op: "EQUALS",
+        value: id,
+      },
+    };
+
+    const connection = await this.dbConnectionFactory.acquirePoolConnection();
+    try {
+      await connection.initialize();
+      const [query, values] = MySqlQueryGenerator.generateDeleteSql(
+        "members",
+        whereCondition
+      );
+
+      const result = (await connection.query<QueryResult>(
+        query,
+        values
+      )) as mysql.ResultSetHeader;
+
+      if (result.affectedRows > 0) {
+        return memberToDelete;
+      } else {
+        throw new Error("Failed to delete member");
+      }
+    } catch (e) {
+      throw new Error("Member creation failed.");
+    } finally {
+      await connection.release();
+    }
   }
 
-  async getById(id: number): Promise<IMember | null> {
-    const members = this.db.table("members");
-    const memberFound = members.find((member) => member.id === id);
-    return memberFound || null;
+  async getById(id: number): Promise<IMember> {
+    const connection =
+      await this.dbConnectionFactory.acquireStandaloneConnection();
+
+    const whereCondition: WhereExpression<IMember> = {
+      id: {
+        op: "EQUALS",
+        value: id,
+      },
+    };
+
+    try {
+      await connection.initialize();
+      const [query, values] = MySqlQueryGenerator.generateSelectSql("members", {
+        where: whereCondition,
+        limit: 1,
+      });
+
+      const result = (await connection.query<QueryResult>(
+        query,
+        values
+      )) as mysql.RowDataPacket;
+
+      if (result.length > 0) {
+        return result[0];
+      } else {
+        throw new Error("Member not found");
+      }
+    } catch (e) {
+      throw new Error("Member not found");
+    } finally {
+      await connection.close();
+    }
   }
 
   async list(searchText?: string): Promise<IMember[]> {
-    const members = this.db.table("members");
-    const search = searchText?.toLowerCase();
-    const filteredMembers = search
-      ? members.filter(
-          (b) =>
-            b.name.toLowerCase().includes(search) ||
-            b.phoneNumber.includes(search)
-        )
-      : members;
-    return filteredMembers;
-  }
-  async reset() {
-    const members = this.db.table("members");
-    members.length = 0;
-    await this.db.save();
+    const connection = await this.dbConnectionFactory.acquirePoolConnection();
+    let whereCondition: WhereExpression<IMember> | undefined;
+
+    if (searchText) {
+      const search = searchText.toLowerCase();
+      whereCondition = {
+        OR: [
+          {
+            name: {
+              op: "CONTAINS",
+              value: search,
+            },
+          },
+          {
+            phoneNumber: {
+              op: "EQUALS",
+              value: search,
+            },
+          },
+        ],
+      };
+    }
+
+    try {
+      await connection.initialize();
+      const [query, values] = MySqlQueryGenerator.generateSelectSql("members", {
+        where: whereCondition,
+        limit: 5,
+        offset: 0,
+      });
+      const result = (await connection.query<QueryResult>(
+        query,
+        values
+      )) as mysql.RowDataPacket[];
+      if (result.length > 0) {
+        return result as IMember[];
+      } else {
+        throw new Error("Not a members found matching the criteria");
+      }
+    } catch (e) {
+      throw new Error(" No members found matching the criteria");
+    } finally {
+      await connection.release();
+    }
   }
 }

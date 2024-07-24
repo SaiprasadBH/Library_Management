@@ -13,17 +13,13 @@ import {
   printSubTitle,
   printTitle,
 } from "../libs/output.utils";
-import { Database } from "../database/db";
-import { LibraryDataset } from "../database/library.dataset";
 import { ITransaction, ITransactionBase } from "../models/transaction.model";
 import { ITransactionBaseSchema } from "../models/transaction.schema";
 import { TransactionRepository } from "./transaction.repository";
-import { BookRepository } from "../book-management/book.repository";
 import { MemberRepository } from "../member-management/member.repository";
-import { IBook } from "../models/book.schema";
-import { IMember } from "../models/member.schema";
 import { IPageRequest } from "../core/pagination";
-import { error } from "console";
+import { MySqlConnectionFactory } from "../database/dbConnection";
+import { BookRepository } from "../book-management/book.repository";
 
 const menu = new Menu([
   { key: "1", label: "Issue Book" },
@@ -37,10 +33,10 @@ export class TransactionInteractor implements IInteractor {
   private bookRepo: BookRepository;
   private memberRepo: MemberRepository;
 
-  constructor(db: Database<LibraryDataset>) {
-    this.repo = new TransactionRepository(db);
-    this.bookRepo = new BookRepository(db);
-    this.memberRepo = new MemberRepository(db);
+  constructor(connFactory: MySqlConnectionFactory) {
+    this.repo = new TransactionRepository(connFactory);
+    this.bookRepo = new BookRepository(connFactory);
+    this.memberRepo = new MemberRepository(connFactory);
   }
 
   async showMenu(): Promise<void> {
@@ -260,8 +256,8 @@ async function issueBook(
         console.table({
           "Book Title": book.title,
           "Member Name": member.name,
-          "Issue Date": createdTransaction.dateOfIssue.toDateString(),
-          "Return Date": createdTransaction.dueDate.toDateString(),
+          "Issue Date": createdTransaction.dateOfIssue,
+          "Return Date": createdTransaction.dueDate,
         });
       }
       printResult(`Book issued successfully.`);
@@ -293,10 +289,10 @@ async function returnBook(
 
     if (transaction) {
       const id = transaction.id;
-      const deletedTransaction: ITransaction | null = await repo.delete(id);
-      if (deletedTransaction) {
-        const book = await bookRepo.getById(deletedTransaction.bookId);
-        const member = await memberRepo.getById(deletedTransaction.memberId);
+      const updatedTransaction: ITransaction | null = await repo.returnBook(id);
+      if (updatedTransaction) {
+        const book = await bookRepo.getById(updatedTransaction.bookId);
+        const member = await memberRepo.getById(updatedTransaction.memberId);
         if (book && member) {
           printHint("\nBook return details:");
           console.table({

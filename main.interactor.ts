@@ -10,12 +10,10 @@ import {
   printTitle,
 } from "./src/libs/output.utils";
 import { Menu } from "./src/libs/menu";
-import { Database } from "./src/database/db";
 import { MemberInteractor } from "./src/member-management/member.interaction";
-import { LibraryDataset } from "./src/database/library.dataset";
 import { TransactionInteractor } from "./src/transaction-management/transaction.interaction";
-import { LibraryDB } from "./src/database/sqlDb";
-import { MockLibraryDataset } from "./src/database/mockLibrary.dataset";
+import { AppEnvs } from "./src/core/read-env";
+import { MySqlConnectionFactory } from "./src/database/dbConnection";
 
 const menu = new Menu([
   { key: "1", label: "Book Management" },
@@ -29,10 +27,10 @@ export class LibraryInteractor implements IInteractor {
   private readonly memberInteractor: MemberInteractor;
   private readonly transactionInteractor: TransactionInteractor;
 
-  constructor(db: Database<LibraryDataset>) {
-    this.bookInteractor = new BookInteractor(db);
-    this.memberInteractor = new MemberInteractor(db);
-    this.transactionInteractor = new TransactionInteractor(db);
+  constructor(private readonly connFactory: MySqlConnectionFactory) {
+    this.bookInteractor = new BookInteractor(connFactory);
+    this.memberInteractor = new MemberInteractor(connFactory);
+    this.transactionInteractor = new TransactionInteractor(connFactory);
   }
 
   async showMenu(): Promise<void> {
@@ -54,7 +52,7 @@ export class LibraryInteractor implements IInteractor {
         await this.transactionInteractor.showMenu();
         break;
       case "4":
-        await sqlDb.shutdownPoolConnection();
+        this.connFactory.shutdown();
         console.log("\n");
         printPanel("! ! ! Bye ! ! !");
         console.log("\n");
@@ -70,9 +68,10 @@ export class LibraryInteractor implements IInteractor {
 }
 
 // Initialize the database and pass it to LibraryInteractor
+const mysqlConnectionFactory = new MySqlConnectionFactory({
+  dbURL: AppEnvs.DATABASE_URL,
+});
 
-const db = new Database<LibraryDataset>("database-files/db.json");
-const sqlDb = new LibraryDB<MockLibraryDataset>();
-const libManager = new LibraryInteractor(db);
+const libManager = new LibraryInteractor(mysqlConnectionFactory);
 
 libManager.showMenu();

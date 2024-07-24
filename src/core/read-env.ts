@@ -1,8 +1,19 @@
-//TODO
-//Note: we can give a robust implementation using data validation library such as zod and then export the parsed object.
+import { configDotenv } from "dotenv";
 
+configDotenv();
 interface AppEnv {
   DATABASE_URL: string;
 }
 
-export const AppEnvs = process.env as unknown as AppEnv;
+// Access and validate environment variables
+const getAppEnvs = (): AppEnv => {
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL is not defined in the environment variables");
+  }
+
+  return {
+    DATABASE_URL: process.env.DATABASE_URL,
+  };
+};
+
+export const AppEnvs = getAppEnvs();

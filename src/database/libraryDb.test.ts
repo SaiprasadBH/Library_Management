@@ -35,7 +35,7 @@ describe("MySQL database adapter tests", () => {
       }
     );
     const selectQueryResult = await mySQLAdapter.runQuery(selectAuthor, data);
-    console.log(selectQueryResult);
+    // console.log(selectQueryResult);
   });
   afterAll(() => {
     mySQLAdapter.shutdown();
@@ -66,21 +66,20 @@ describe("MySQL database class tests", () => {
       offset: 0,
       limit: 15,
     });
-    console.table(bookResult);
+    // console.table(bookResult);
   });
 
   test("Insert API of database layer", async () => {
     const test_book: Omit<IBook, "id"> = {
       title: "Wake up and live life",
       author: "John Doe",
-      genre: ["Sci-fi"],
+      genre: "Sci-fi",
       isbnNo: "123456789abcd",
       publisher: "Penguin",
       numOfPages: 200,
       totalNumOfCopies: 20,
       availableNumOfCopies: 20,
     };
-
     const bookTitleAndAuthor: SimpleWhereExpression<IBook> = {
       title: {
         value: "Wake up and live life",
@@ -93,24 +92,25 @@ describe("MySQL database class tests", () => {
     };
 
     const bookResult = await db.insert<IBook>("books", test_book);
-    console.table(bookResult);
+    // console.table(bookResult);
 
     const selectedBook = await db.select<IBook>("books", {
-      where: bookTitleAndAuthor,
+      limit: 10,
+      offset: 0,
     });
-    console.table(selectedBook);
+    // console.log(selectedBook);
 
     const updatedBook = await db.update<IBook>(
       "books",
       test_book,
       bookTitleAndAuthor
     );
-    console.table(updatedBook);
+    // console.table(updatedBook);
 
     const bookDeleteResult = await db.delete<IBook>(
       "books",
       bookTitleAndAuthor
     );
-    console.table(bookDeleteResult);
+    // console.table(bookDeleteResult);
   });
 });

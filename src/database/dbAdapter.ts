@@ -1,14 +1,7 @@
 // this layer needs to be initialized in the main.interactor.
 import mysql from "mysql2/promise";
 import "dotenv/config";
-
-/**
- * This is the config object that must be passed to create the MySQLAdapter.
- */
-interface DBConfig {
-  // The complete url to the database with user_name, password, host, port and database name.
-  dbURL: string;
-}
+import { DBConfig } from "./dbTypes";
 
 interface Adapter {
   shutdown: () => Promise<void>;

@@ -16,7 +16,7 @@ export const BookSchemaBase = z.object({
   publisher: z
     .string({ message: "Publisher name must be a string." })
     .min(3, { message: "Publisher name must be minimum 3 characters long." }),
-  genre: z.array(zNonNumString),
+  genre: z.string({ message: "Genre must be a string." }),
   isbnNo: z
     .string()
     .min(13, { message: "ISBN number must be 13 characters long." })
