@@ -1,4 +1,4 @@
-import { Row } from "../database/db";
+import { Row } from "../database/oldDbHandlingUtilities/db";
 
 export interface IBookBase extends Row {
   title: string;

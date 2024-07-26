@@ -6,11 +6,13 @@
   "scripts": {
     "test": "vitest",
     "start": "ts-node main.interactor.ts",
-    "generate": "drizzle-kit generate mysql2"
+    "generate": "drizzle-kit generate mysql2",
+    "migrate": "ts-node ./drizzle-mysql2-orm/migration.ts"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@planetscale/database": "^1.18.0",
     "chalk": "^4.1.2",
     "dotenv": "^16.4.5",
     "drizzle-orm": "^0.32.1",
