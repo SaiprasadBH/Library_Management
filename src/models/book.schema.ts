@@ -33,7 +33,7 @@ export const BookSchemaBase = z.object({
 
 export const BookSchema = BookSchemaBase.extend({
   id: z.number().int().min(1),
-  availableNumOfCopies: z.number().int().min(0).optional(),
+  availableNumOfCopies: z.number().int().min(0),
 });
 
 export type IBookBase = z.input<typeof BookSchemaBase>;

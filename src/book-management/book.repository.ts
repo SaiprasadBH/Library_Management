@@ -1,180 +1,149 @@
 import { IRepository } from "../core/repository";
 import { IBook } from "../models/book.model";
-import { BookSchemaBase, IBookBase } from "../models/book.schema";
-import { MySqlConnectionFactory } from "../database/dbConnection";
-import { QueryResult } from "mysql2/promise";
-import { WhereExpression } from "../database/dbTypes";
-import { MySqlQueryGenerator } from "../libs/mysql-query-generator";
-import mysql from "mysql2/promise";
-import { IPagedResponse, IPageRequest } from "../core/pagination";
+import { BookSchema, BookSchemaBase, IBookBase } from "../models/book.schema";
+import { WhereExpression } from "../database/oldDbHandlingUtilities/dbTypes";
+import { IPageRequest, IPagedResponse } from "../core/pagination";
+import { MySQLConnectionFactory } from "../database/oldDbHandlingUtilities/connectionFactory";
+import { getMysqlQuery } from "../libs/oldDbHandlingLibs/mysql-query-handler";
+import { ResultSetHeader } from "mysql2";
+
+export type SearchObject = {
+  matchedItem: IBook;
+  whereClause: WhereExpression<IBook>;
+};
 
 export class BookRepository implements IRepository<IBookBase, IBook> {
-  constructor(private readonly dbConnectionFactory: MySqlConnectionFactory) {}
+  constructor(private readonly dbConnFactory: MySQLConnectionFactory) {}
 
-  async create(data: IBookBase): Promise<IBook> {
-    const validatedData = BookSchemaBase.parse(data);
+  private getByIdWhereClause(bookId: number): WhereExpression<IBook> {
+    return {
+      id: {
+        op: "EQUALS",
+        value: bookId,
+      },
+    };
+  }
 
-    const newBook: Omit<IBook, "id"> = {
+  async create(newBookdata: IBookBase): Promise<IBook | undefined> {
+    let validatedData = BookSchemaBase.parse(newBookdata);
+    validatedData = {
       ...validatedData,
       availableNumOfCopies: validatedData.totalNumOfCopies,
-    };
-
-    const connection = await this.dbConnectionFactory.acquirePoolConnection();
-
+    } as IBook;
+    // Generation of queries:
+    const insertQuery = getMysqlQuery("insert", "Books", {
+      row: validatedData,
+    })!;
+    const selectQuery = getMysqlQuery("select", "Books", {
+      where: { isbnNo: { op: "EQUALS", value: validatedData.isbnNo } },
+    })!;
+    // Execution of queries:
+    const poolConnection = await this.dbConnFactory.acquirePoolConnection();
     try {
-      await connection.initialize();
-      const [query, values] = MySqlQueryGenerator.generateInsertSql<IBook>(
-        "books",
-        newBook
+      const result = await poolConnection.query<ResultSetHeader>(
+        insertQuery.query,
+        insertQuery.values
       );
-
-      const result = (await connection.query<QueryResult>(
-        query,
-        values
-      )) as mysql.ResultSetHeader;
-
-      const insertId = result.insertId;
-      return await this.getById(insertId);
-    } catch (e) {
-      throw new Error((e as Error).message);
+      if (!result.insertId) throw new Error("Book not added");
+      const createdBook = (
+        (await poolConnection.query(
+          selectQuery.query,
+          selectQuery.values
+        )) as IBook[]
+      )[0];
+      return createdBook;
+    } catch (err) {
+      if (err instanceof Error) throw new Error(err.message);
     } finally {
-      await connection.release();
+      await poolConnection.release();
     }
   }
+  async update(bookId: number, data: IBookBase): Promise<IBook | undefined> {
+    let validatedData: Partial<IBook>;
+    if (Object.keys(data).includes("id"))
+      validatedData = BookSchema.parse(data);
+    else validatedData = BookSchemaBase.parse(data);
 
-  async update(
-    id: number,
-    data: IBookBase,
-    availableNumOfCopies?: number
-  ): Promise<IBook> {
-    const bookToUpdate = await this.getById(id);
-    if (!bookToUpdate) {
-      throw new Error("Book not found");
-    }
-
-    const validatedData = BookSchemaBase.parse(data);
-    const updatedBook: IBook = {
-      ...bookToUpdate,
+    const oldData = (await this.getById(bookId))!;
+    const newData = {
+      ...oldData,
       ...validatedData,
+    };
+    const updatedData: IBook = {
+      ...newData,
       availableNumOfCopies:
-        availableNumOfCopies !== undefined
-          ? availableNumOfCopies
-          : validatedData.totalNumOfCopies -
-            (bookToUpdate.totalNumOfCopies - bookToUpdate.availableNumOfCopies),
+        newData.totalNumOfCopies -
+        (oldData.totalNumOfCopies - newData.availableNumOfCopies),
     };
-    const whereCondition: WhereExpression<IBook> = {
-      id: {
-        op: "EQUALS",
-        value: id,
-      },
-    };
-
-    const connection = await this.dbConnectionFactory.acquirePoolConnection();
+    // Generation of queries:
+    const updateWhereClause = this.getByIdWhereClause(bookId);
+    const updateQuery = getMysqlQuery("update", "Books", {
+      row: updatedData,
+      where: updateWhereClause,
+    })!;
+    // Execution of queries:
+    const poolConnection = await this.dbConnFactory.acquirePoolConnection();
     try {
-      await connection.initialize();
-      const [query, values] = MySqlQueryGenerator.generateUpdateSql(
-        "books",
-        updatedBook,
-        whereCondition
-      );
-
-      const result = (await connection.query<QueryResult>(
-        query,
-        values
-      )) as mysql.ResultSetHeader;
-
-      if (result.affectedRows > 0) {
-        return updatedBook;
-      } else {
-        throw new Error("Failed to update book");
-      }
-    } catch (e) {
-      throw new Error("Could not update book.");
+      await poolConnection.query(updateQuery.query, updateQuery.values);
+      return updatedData;
+    } catch (err) {
+      if (err instanceof Error) throw new Error(err.message);
     } finally {
-      await connection.release();
+      await poolConnection.release();
     }
   }
 
-  async delete(id: number): Promise<IBook | null> {
-    const bookToDelete = await this.getById(id);
-    if (!bookToDelete) {
-      throw new Error("Book not found");
-    }
+  async delete(bookId: number): Promise<IBook | undefined> {
+    const deletedBook = await this.getById(bookId);
+    // Generation of queries:
+    const deleteWhereClause: WhereExpression<IBook> =
+      this.getByIdWhereClause(bookId);
+    const deleteQuery = getMysqlQuery("delete", "Books", {
+      where: deleteWhereClause,
+    })!;
 
-    const whereCondition: WhereExpression<IBook> = {
-      id: {
-        op: "EQUALS",
-        value: id,
-      },
-    };
-
-    const connection = await this.dbConnectionFactory.acquirePoolConnection();
+    // Execution of queries:
+    const poolConnection = await this.dbConnFactory.acquirePoolConnection();
     try {
-      await connection.initialize();
-      const [query, values] = MySqlQueryGenerator.generateDeleteSql(
-        "books",
-        whereCondition
-      );
-
-      const result = (await connection.query<QueryResult>(
-        query,
-        values
-      )) as mysql.ResultSetHeader;
-
-      if (result.affectedRows > 0) {
-        return bookToDelete;
-      } else {
-        throw new Error("Failed to delete book");
-      }
-    } catch (e) {
-      throw new Error("Book deletion failed.");
+      await poolConnection.query(deleteQuery.query, deleteQuery.values);
+      return deletedBook;
+    } catch (err) {
+      if (err instanceof Error) throw new Error(err.message);
     } finally {
-      await connection.release();
+      await poolConnection.release();
     }
   }
 
-  async getById(id: number): Promise<IBook> {
-    const connection =
-      await this.dbConnectionFactory.acquireStandaloneConnection();
-
-    const whereCondition: WhereExpression<IBook> = {
-      id: {
-        op: "EQUALS",
-        value: id,
-      },
-    };
-
+  async getById(bookId: number): Promise<IBook | undefined> {
+    // Generation of queries:
+    const selectWhereClause = this.getByIdWhereClause(bookId);
+    const selectQuery = getMysqlQuery("select", "Books", {
+      where: selectWhereClause,
+    })!;
+    // Execution of queries:
+    const poolConnection = await this.dbConnFactory.acquirePoolConnection();
     try {
-      await connection.initialize();
-      const [query, values] = MySqlQueryGenerator.generateSelectSql("books", {
-        where: whereCondition,
-        limit: 1,
-      });
-
-      const result = (await connection.query<QueryResult>(
-        query,
-        values
-      )) as mysql.RowDataPacket;
-
-      if (result.length > 0) {
-        return result[0];
-      } else {
-        throw new Error("Book not found");
-      }
-    } catch (e) {
-      throw new Error("Book not found.");
+      const selectedBook = (
+        (await poolConnection.query(
+          selectQuery.query,
+          selectQuery.values
+        )) as IBook[]
+      )[0];
+      if (!selectedBook) throw new Error("Book not found");
+      return selectedBook;
+    } catch (err) {
+      if (err instanceof Error) throw new Error(err.message);
     } finally {
-      await connection.close();
+      await poolConnection.release();
     }
   }
 
-  async list(searchText?: string): Promise<IBook[]> {
-    const connection = await this.dbConnectionFactory.acquirePoolConnection();
-    let whereCondition: WhereExpression<IBook> | undefined;
-
-    if (searchText) {
-      const search = searchText.toLowerCase();
-      whereCondition = {
+  async list(params: IPageRequest): Promise<IPagedResponse<IBook> | undefined> {
+    let filteredBooks: IBook[];
+    let searchWhereClause: WhereExpression<IBook> | undefined;
+    if (params.search) {
+      const search = params.search.toLowerCase();
+      searchWhereClause = {
         OR: [
           {
             title: {
@@ -184,33 +153,46 @@ export class BookRepository implements IRepository<IBookBase, IBook> {
           },
           {
             isbnNo: {
-              op: "EQUALS",
+              op: "CONTAINS",
               value: search,
             },
           },
         ],
       };
     }
-
+    // Generation of queries:
+    const selectQuery = getMysqlQuery("select", "Books", {
+      where: searchWhereClause,
+      pagination: { offset: params.offset, limit: params.limit },
+    })!;
+    // Execution of queries:
+    const poolConnection = await this.dbConnFactory.acquirePoolConnection();
     try {
-      await connection.initialize();
-      const [query, values] = MySqlQueryGenerator.generateSelectSql("books", {
-        where: whereCondition,
-      });
-      const result = (await connection.query<QueryResult>(
-        query,
-        values
-      )) as mysql.RowDataPacket[];
-
-      if (result.length > 0) {
-        return result as IBook[];
-      } else {
+      filteredBooks = (await poolConnection.query(
+        selectQuery.query,
+        selectQuery.values
+      )) as IBook[];
+      if (filteredBooks.length === 0)
         throw new Error("No books found matching the criteria");
-      }
-    } catch (e) {
-      throw new Error((e as Error).message);
+      const countQuery = getMysqlQuery("count", "Books", {
+        where: searchWhereClause,
+      })!;
+      const totalMatchedBooks = (await poolConnection.query(
+        countQuery.query,
+        countQuery.values
+      )) as { count: number }[];
+      return {
+        items: filteredBooks,
+        pagination: {
+          offset: params.offset,
+          limit: params.limit,
+          total: totalMatchedBooks[0].count,
+        },
+      };
+    } catch (err) {
+      if (err instanceof Error) throw new Error(err.message);
     } finally {
-      await connection.release();
+      await poolConnection.release();
     }
   }
 }

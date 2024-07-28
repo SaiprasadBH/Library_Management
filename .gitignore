@@ -1,5 +1,8 @@
 node_modules
 database-test-files
 database-files
-.env*
+*.env*
 *.yaml
+
+oldDbHandlingLibs/
+oldDbHandlingUtilities/

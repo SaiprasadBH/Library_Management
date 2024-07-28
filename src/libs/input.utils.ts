@@ -13,14 +13,9 @@ export const readLine = (
   question: string,
   defaultInput?: string
 ): Promise<string> => {
-  // console.log(chalk.green(question));
   return new Promise((resolve) => {
     if (defaultInput) populateInputBuffer(defaultInput);
-    // let g: string;
-    // if (defaultInput) g = prompt(question, defaultInput)!;
-    // else g = prompt(question)!;
-    // resolve(g);
-    rl.question(chalk.green(question), (input) => {
+    rl.question("\n" + chalk.green(question), (input) => {
       resolve(input);
     });
   });

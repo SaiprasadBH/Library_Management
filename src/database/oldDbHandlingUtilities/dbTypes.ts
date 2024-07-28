@@ -1,6 +1,7 @@
-export type ColumnData = string | number | boolean | null;
-export type ColumnSet<T> = Omit<T, "id">;
-export type UpdateColumnSet<T> = Partial<ColumnSet<T>>;
+import { QueryConfig } from "./query-config.type";
+
+export type ColumnData<T, K extends keyof T> = T[K];
+export type RowData<T> = { [K in keyof Partial<T>]: ColumnData<T, K> };
 
 export type StringOperator =
   | "EQUALS"
@@ -21,6 +22,7 @@ export type NumberOperator =
   | "LESSER_THAN_EQUALS";
 
 export type BooleanOperator = "EQUALS" | "NOT_EQUALS";
+
 export type VectorOperator = "IN" | "NOT_IN";
 
 export type StringOperatorParam = {
@@ -40,7 +42,9 @@ export type BooleanOperatorParam = {
 
 export type VectorOperatorParam<CompleteModel> = {
   op: VectorOperator;
-  value: ColumnData[] | NestedQuery<CompleteModel>;
+  value:
+    | ColumnData<CompleteModel, keyof CompleteModel>[]
+    | NestedQuery<CompleteModel>;
 };
 
 export type PageOption = {
@@ -80,17 +84,17 @@ export type WhereExpression<CompleteModel> =
   | OrWhereExpression<CompleteModel>
   | AndWhereExpression<CompleteModel>;
 
-export interface Query {
-  sql: string;
-  data: ColumnData[];
+export interface PreparedStatement<CompleteModel> {
+  query: string;
+  values: ColumnData<CompleteModel, keyof CompleteModel>[];
 }
 
-export interface NestedQuery<CompleteModel> {
+export interface NestedQuery<CompleteModel> extends QueryConfig<CompleteModel> {
   tableName: string;
-  fieldsToSelect?: Array<keyof Partial<CompleteModel>>;
-  where: WhereExpression<CompleteModel>;
-  offset?: number;
-  limit?: number;
+  // fieldsToSelect?: Array<keyof Partial<CompleteModel>>;
+  // where: WhereExpression<CompleteModel>;
+  // offset?: number;
+  // limit?: number;
 }
 
 /**
@@ -100,3 +104,5 @@ export interface DBConfig {
   // The complete url to the database with user_name, password, host, port and database name.
   dbURL: string;
 }
+
+export type QueryTypes = "select" | "insert" | "update" | "delete" | "count";

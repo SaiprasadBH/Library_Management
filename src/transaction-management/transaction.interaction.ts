@@ -1,56 +1,51 @@
 import { z } from "zod";
-import { clearScreen, readChar, readLine } from "../libs/input.utils";
+import { clearScreen, readLine } from "../libs/input.utils";
 import { IInteractor } from "../core/interactor";
 import { Menu } from "../libs/menu";
 import {
-  enterButton,
-  printChoice,
+  printButton,
   printError,
   printHint,
-  printMenu,
-  printPanel,
   printResult,
-  printSubTitle,
-  printTitle,
 } from "../libs/output.utils";
 import { ITransaction, ITransactionBase } from "../models/transaction.model";
 import { ITransactionBaseSchema } from "../models/transaction.schema";
 import { TransactionRepository } from "./transaction.repository";
 import { MemberRepository } from "../member-management/member.repository";
-import { IPageRequest } from "../core/pagination";
-import { MySqlConnectionFactory } from "../database/dbConnection";
+import { IBook } from "../models/book.schema";
+import { IMember } from "../models/member.schema";
+import { IPagedResponse, IPageRequest } from "../core/pagination";
+import { MySQLConnectionFactory } from "../database/oldDbHandlingUtilities/connectionFactory";
 import { BookRepository } from "../book-management/book.repository";
+import { loadPage, displayPage } from "../libs/pagination.utils";
+import * as readline from "readline";
 
-const menu = new Menu([
-  { key: "1", label: "Issue Book" },
-  { key: "2", label: "Return Book" },
-  { key: "3", label: "Search for Transaction" },
-  { key: "4", label: "Previous Menu" },
-]);
+const menu = new Menu(
+  [
+    { key: "1", label: "Issue Book" },
+    { key: "2", label: "Return Book" },
+    { key: "3", label: "Search for Transaction" },
+    { key: "4", label: "Back" },
+  ],
+  "Transaction Management"
+);
 
 export class TransactionInteractor implements IInteractor {
   private repo: TransactionRepository;
   private bookRepo: BookRepository;
   private memberRepo: MemberRepository;
 
-  constructor(connFactory: MySqlConnectionFactory) {
-    this.repo = new TransactionRepository(connFactory);
-    this.bookRepo = new BookRepository(connFactory);
-    this.memberRepo = new MemberRepository(connFactory);
+  constructor(private readonly dbConnFactory: MySQLConnectionFactory) {
+    this.repo = new TransactionRepository(this.dbConnFactory);
+    this.bookRepo = new BookRepository(this.dbConnFactory);
+    this.memberRepo = new MemberRepository(this.dbConnFactory);
   }
 
   async showMenu(): Promise<void> {
     let loop = true;
     while (loop) {
-      printTitle();
-      printSubTitle("Transaction Management");
-      printMenu();
-      const op = await readChar(menu.serialize());
-      clearScreen();
-      printTitle();
-      printSubTitle("Transaction Management");
-      const menuItem = menu.getItem(op);
-      printChoice(`${menuItem?.label}`);
+      const op = await menu.selectMenuItem();
+
       switch (op.toLowerCase()) {
         case "1":
           await issueBook(this.repo, this.bookRepo, this.memberRepo);
@@ -66,11 +61,10 @@ export class TransactionInteractor implements IInteractor {
           break;
         default:
           printError("Invalid choice");
-          printHint(`Press ${enterButton} to continue`);
+          printHint(`Press ${printButton} to continue`);
           await readLine("");
           break;
       }
-      clearScreen();
     }
   }
 }
@@ -78,86 +72,21 @@ export class TransactionInteractor implements IInteractor {
 // New function to search for transactions
 async function searchForTransaction(repo: TransactionRepository) {
   printHint(
-    `Press ${enterButton} on empty search field to show all transactions. Default limit will be set to 5.`
+    `Press ${printButton} on empty search field to show all transactions. Default limit will be set to 5.`
   );
   const searchText = await readLine("Search for bookId or memberId: ");
   const offset = 0;
   const defaultLimit: number = 5;
-  printHint(`Press ${enterButton} to set default limit to 5`);
+  printHint(`Press ${printButton} to set default limit to 5`);
   const limit = await checkInt(
     await readLine("Enter limit: ", defaultLimit.toString())
   );
-  const pageRequest: IPageRequest = { offset, limit };
+  const pageRequest: IPageRequest = { search: searchText, offset, limit };
+  await loadPage(repo, pageRequest);
 
-  const searchResultItems = await repo.list(searchText);
-  if (searchResultItems.length === 0) {
-    printError("No match found");
-  } else {
-    const currPage = searchResultItems.slice(offset, limit);
-    await loadPage(currPage, pageRequest, searchResultItems, searchText);
-  }
   return;
 }
 
-// Function to update the page for pagination
-function updatePage(key: string, page: IPageRequest, items: ITransaction[]) {
-  const total = items.length;
-  let limit = page.limit;
-
-  if (key === "\u001b[C") {
-    if (page.offset + limit < total) {
-      page.offset = page.offset + limit;
-    }
-  } else if (key === "\u001b[D") {
-    if (page.offset - limit >= 0) {
-      page.offset = page.offset - limit;
-    }
-  }
-  const updatedPageIndex = Math.floor(page.offset / page.limit) + 1;
-  const updatedPage = items.slice(page.offset, limit + page.offset);
-  return { updatedPage, updatedPageIndex };
-}
-
-// Function to load the paginated results
-const loadPage = async (
-  initialPage: ITransaction[],
-  pageRequest: IPageRequest,
-  searchResultItems: ITransaction[],
-  searchText?: string
-) => {
-  let loadedPage = initialPage;
-  let pageIndex = 1;
-  const totalPages = Math.ceil(searchResultItems.length / pageRequest.limit);
-  while (true) {
-    clearScreen();
-    printResult(
-      searchText
-        ? `Search result for "${searchText}"`
-        : "All current transactions in the Library"
-    );
-    displayPage(loadedPage);
-
-    const navPanel = `${pageIndex === 1 ? "" : "<"} ${pageIndex}/${totalPages} ${pageIndex === totalPages ? "" : ">"}`;
-    printPanel(`${navPanel}`);
-
-    printHint(`Press ${enterButton} to continue`);
-    const key = await readChar();
-    if (key === "\u001b[C" || key === "\u001b[D") {
-      const { updatedPage, updatedPageIndex } = updatePage(
-        key,
-        pageRequest,
-        searchResultItems
-      );
-      loadedPage = updatedPage;
-      pageIndex = updatedPageIndex;
-    } else if (key === "\r") break;
-  }
-};
-
-// Function to display the transactions in a table format
-const displayPage = (items: ITransaction | ITransaction[]) => {
-  console.table(items);
-};
 const checkInt = async (value: string | number): Promise<number> => {
   if (typeof value === "number") return value;
   const intValue = parseInt(value);
@@ -170,11 +99,13 @@ async function validateInput<T>(question: string, schema: z.Schema<T>) {
   do {
     const input = await readLine(question);
     try {
+      menu.updateFrame(menu.selectedItem);
       return schema.parse(
         schema instanceof z.ZodNumber ? Number(input) : input
       );
     } catch (error) {
       if (error instanceof z.ZodError) {
+        menu.updateFrame(menu.selectedItem);
         printError(`Invalid input: ${error.errors[0].message}`);
       }
     }
@@ -198,7 +129,7 @@ async function getIssueInput(
       );
       continue;
     }
-    console.table(book);
+    displayPage(book);
     break;
   }
 
@@ -213,7 +144,7 @@ async function getIssueInput(
       printError("Member not found. Please enter a valid Member ID.");
       continue;
     }
-    console.table(member);
+    displayPage(member);
     break;
   }
 
@@ -247,7 +178,7 @@ async function issueBook(
       memberRepo
     );
 
-    const createdTransaction: ITransaction = await repo.create(bookIssueData);
+    const createdTransaction = await repo.create(bookIssueData);
     if (createdTransaction) {
       const book = await bookRepo.getById(createdTransaction.bookId);
       const member = await memberRepo.getById(createdTransaction.memberId);
@@ -263,10 +194,10 @@ async function issueBook(
       printResult(`Book issued successfully.`);
     }
   } catch (error: unknown) {
-    if (error instanceof Error) console.log(error.message);
+    if (error instanceof Error) printError(error.message);
   }
 
-  printHint(`Press ${enterButton} to continue`);
+  printHint(`Press ${printButton} to continue`);
   await readLine("");
   return;
 }
@@ -278,8 +209,13 @@ async function returnBook(
 ) {
   try {
     const bookReturnData: ITransactionBase = await getReturnInput();
-    const transactions = await repo.list(`${bookReturnData.bookId}`);
-    const transaction = transactions.find((item) => {
+    const pageRequest: IPageRequest = {
+      search: `${bookReturnData.bookId}`,
+      offset: 0,
+      limit: 5,
+    };
+    const transactions = await repo.list(pageRequest);
+    const transaction = transactions?.items.find((item) => {
       return (
         item.bookId === bookReturnData.bookId &&
         item.memberId === bookReturnData.memberId &&
@@ -289,10 +225,10 @@ async function returnBook(
 
     if (transaction) {
       const id = transaction.id;
-      const updatedTransaction: ITransaction | null = await repo.returnBook(id);
-      if (updatedTransaction) {
-        const book = await bookRepo.getById(updatedTransaction.bookId);
-        const member = await memberRepo.getById(updatedTransaction.memberId);
+      const deletedTransaction = await repo.delete(id);
+      if (deletedTransaction) {
+        const book = await bookRepo.getById(deletedTransaction.bookId);
+        const member = await memberRepo.getById(deletedTransaction.memberId);
         if (book && member) {
           printHint("\nBook return details:");
           console.table({
@@ -309,7 +245,7 @@ async function returnBook(
     if (error instanceof Error) printError(error.message);
   }
 
-  printHint(`Press ${enterButton} to continue`);
+  printHint(`Press ${printButton} to continue`);
   await readLine("");
   return;
 }

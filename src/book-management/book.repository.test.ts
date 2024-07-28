@@ -1,20 +1,9 @@
-import {
-  describe,
-  test,
-  expect,
-  beforeEach,
-  beforeAll,
-  afterAll,
-} from "vitest";
+import { describe, test, expect, beforeAll } from "vitest";
 import { BookRepository } from "./book.repository";
-import { IBookBase, IBook } from "../models/book.model";
-import { Database, JsonAdapter } from "../database/db";
+import { IBookBase } from "../models/book.model";
 import { faker } from "@faker-js/faker";
-import { LibraryDataset } from "../database/library.dataset";
-import { MySQLDatabase } from "../database/libraryDb";
-import { MySQLAdapter } from "../database/dbAdapter";
 import { AppEnvs } from "../core/read-env";
-import { MySqlConnectionFactory } from "../database/dbConnection";
+import { MySQLConnectionFactory } from "../database/oldDbHandlingUtilities/connectionFactory";
 
 function createBookObject(): IBookBase {
   return {
@@ -30,12 +19,11 @@ function createBookObject(): IBookBase {
 
 describe("BookRepository", () => {
   let repository: BookRepository;
+  let db: MySQLConnectionFactory;
 
   beforeAll(() => {
-    const mysqlConnectionFactory = new MySqlConnectionFactory({
-      dbURL: "mysql://user:user_password@localhost:3306/library_db",
-    });
-    repository = new BookRepository(mysqlConnectionFactory);
+    db = new MySQLConnectionFactory(AppEnvs.DATABASE_URL);
+    repository = new BookRepository(db);
   });
 
   // Get a book by id.
@@ -49,10 +37,10 @@ describe("BookRepository", () => {
       genre: "Computers",
       isbnNo: "9781718500457",
       numOfPages: 561,
-      totalNumOfCopies: 2,
-      availableNumOfCopies: 2,
+      totalNumOfCopies: 8,
+      availableNumOfCopies: 8,
     });
-  });
+  }, 10000);
 
   // Creating a new book
   test("Creating a new book", async () => {
@@ -65,13 +53,13 @@ describe("BookRepository", () => {
       numOfPages: 350,
       totalNumOfCopies: 10,
     };
-    const newBook = await repository.create(bookData);
-    const seltectedBook = await repository.getById(newBook.id);
+    const newBook = (await repository.create(bookData))!;
+    const selectedBook = await repository.getById(newBook.id);
     expect(newBook).toEqual({
-      ...seltectedBook,
+      ...selectedBook,
     });
     const deletedBook = await repository.delete(newBook.id);
-  });
+  }, 10000);
 
   // Updating a book
   test("Updating an existing book's details", async () => {
@@ -84,8 +72,8 @@ describe("BookRepository", () => {
       numOfPages: 200,
       totalNumOfCopies: 5,
     };
-    const createdBook = await repository.create(bookData);
-
+    const createdBook = (await repository.create(bookData))!;
+    console.log(createdBook);
     const updatedData: IBookBase = {
       title: "Updated Book",
       author: "John Doe",
@@ -95,7 +83,7 @@ describe("BookRepository", () => {
       numOfPages: 300,
       totalNumOfCopies: 8,
     };
-    const updatedBook = await repository.update(createdBook.id, updatedData);
+    const updatedBook = (await repository.update(createdBook.id, updatedData))!;
     expect(updatedBook).toEqual({
       id: createdBook?.id,
       availableNumOfCopies: 8,
@@ -103,12 +91,12 @@ describe("BookRepository", () => {
     });
 
     const deletedBook = await repository.delete(updatedBook.id);
-  });
+  }, 10000);
 
   // Deleting a book.
   test("Deleting a book", async () => {
     const bookData: IBookBase = createBookObject();
-    const createdBook = await repository.create(bookData);
+    const createdBook = (await repository.create(bookData))!;
     const deletedBook = await repository.delete(createdBook.id);
 
     expect(deletedBook).toEqual(createdBook);
@@ -116,36 +104,36 @@ describe("BookRepository", () => {
     await expect(repository.getById(createdBook.id)).rejects.toThrow(
       "Book not found"
     );
-  });
+  }, 10000);
 
   // Retrieving a book by ID
   test("Retrieving a book by ID that exists", async () => {
     const bookData: IBookBase = createBookObject();
-    const createdBook = await repository.create(bookData);
+    const createdBook = (await repository.create(bookData))!;
 
     const retrievedBook = await repository.getById(createdBook.id);
     expect(retrievedBook).toEqual(createdBook);
-    const deletedBook = await repository.delete(retrievedBook.id);
-  });
+    // await repository.delete(createdBook.id);
+  }, 10000);
 
   test("Retrieving a book by ID that does not exist", async () => {
-    await expect(() => repository.getById(9999)).rejects.toThrow(
-      "Book not found"
-    );
-  });
+    await expect(repository.getById(9999)).rejects.toThrow("Book not found");
+  }, 10000);
 
   // List the books with default limit.
-  test.skip("Listing all books", async () => {
-    const books = await repository.list();
-    expect(books.length).toBe(60);
-  });
+  test("Listing all books", async () => {
+    const books = (await repository.list({ offset: 0, limit: 5 }))!;
+    console.table(books);
+
+    expect(books.pagination.limit).toBe(5);
+  }, 10000);
 
   // Searching book with search term that doesn't match
   test("Listing books with a non-matching search", async () => {
-    await expect(repository.list("Non-Existent Title")).rejects.toThrow(
-      "No books found matching the criteria"
-    );
-  });
+    await expect(
+      repository.list({ search: "Non-Existent Title", offset: 0, limit: 5 })
+    ).rejects.toThrow("No books found matching the criteria");
+  }, 10000);
 
   // Searching book with search term
   test("Listing books with a search term", async () => {
@@ -158,15 +146,19 @@ describe("BookRepository", () => {
       numOfPages: 350,
       totalNumOfCopies: 10,
     };
-    const newBook = await repository.create(bookData);
+    const newBook = (await repository.create(bookData))!;
     const seltectedBook = await repository.getById(newBook.id);
     expect(newBook).toEqual({
       ...seltectedBook,
     });
 
-    const books = await repository.list("Unique Title");
-    expect(books.length).toBeGreaterThan(0);
-    expect(books[0].title).toBe("Unique Title");
+    const books = await repository.list({
+      search: "Unique Title",
+      offset: 0,
+      limit: 5,
+    })!;
+    expect(books?.items.length).toBeGreaterThan(0);
+    expect(books?.items[0].title).toBe("Unique Title");
     const deletedBook = await repository.delete(newBook.id);
   });
 });

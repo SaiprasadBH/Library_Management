@@ -1,15 +1,17 @@
-import { test, expect } from "vitest";
+import { test, expect, describe } from "vitest";
 import { MySqlQueryGenerator } from "./mysql-query-generator";
 import {
   WhereExpression,
-  ColumnSet,
+  RowData,
   SimpleWhereExpression,
   OrWhereExpression,
   AndWhereExpression,
+  PreparedStatement,
   NestedQuery,
-} from "../database/dbTypes";
-import { describe } from "node:test";
-import { IBook } from "../models/book.schema";
+} from "../../database/oldDbHandlingUtilities/dbTypes";
+import { IBook } from "../../models/book.schema";
+import { IMemberBase } from "../../models/member.schema";
+import { QueryConfig } from "../../database/oldDbHandlingUtilities/query-config.type";
 
 describe("second set of tests", () => {
   test("simple where expression generation tests", () => {
@@ -19,11 +21,11 @@ describe("second set of tests", () => {
         value: "Sudha moorthy",
       },
     };
-    const [simpleWhere, data]: [string, unknown[]] =
+    const { query, values } =
       MySqlQueryGenerator.generateWhereClauseSql<IBook>(simpleWhereParam);
 
-    expect(simpleWhere).toEqual("(`author` LIKE ?)");
-    expect(data).toEqual(["%Sudha moorthy%"]);
+    expect(query).toEqual("(`author` LIKE ?)");
+    expect(values).toEqual(["%Sudha moorthy%"]);
   });
 
   test("OrWhereExpression test", () => {
@@ -44,11 +46,11 @@ describe("second set of tests", () => {
       ],
     };
 
-    const [query, data] = MySqlQueryGenerator.generateWhereClauseSql<IBook>(
+    const { query, values } = MySqlQueryGenerator.generateWhereClauseSql<IBook>(
       OrWhereExpressionParam
     );
     expect(query).toEqual("((`author` LIKE ?) OR (`totalNumOfCopies` >= ?))");
-    expect(data).toEqual(["%Sudha moorthy%", 10]);
+    expect(values).toEqual(["%Sudha moorthy%", 10]);
   });
 
   test("AndWhereExpression test", () => {
@@ -69,11 +71,11 @@ describe("second set of tests", () => {
       ],
     };
 
-    const [query, data] = MySqlQueryGenerator.generateWhereClauseSql<IBook>(
+    const { query, values } = MySqlQueryGenerator.generateWhereClauseSql<IBook>(
       andWhereExpressionParams
     );
     expect(query).toEqual("((`author` LIKE ?) AND (`totalNumOfCopies` >= ?))");
-    expect(data).toEqual(["%Sudha moorthy%", 10]);
+    expect(values).toEqual(["%Sudha moorthy%", 10]);
   });
 
   test("Nested OR and And Where Clauses test", () => {
@@ -103,12 +105,12 @@ describe("second set of tests", () => {
         },
       ],
     };
-    const [query, data] =
+    const { query, values } =
       MySqlQueryGenerator.generateWhereClauseSql(WhereExpressionParam);
     expect(query).toEqual(
       "(((`author` LIKE ?) OR (`totalNumOfCopies` >= ?)) AND (`publisher` LIKE ?))"
     );
-    expect(data).toEqual(["%Sudha moorthy%", 10, "%Penguin UK%"]);
+    expect(values).toEqual(["%Sudha moorthy%", 10, "%Penguin UK%"]);
   });
 
   test("generate correct SQL for nested queries", () => {
@@ -127,14 +129,14 @@ describe("second set of tests", () => {
       },
     };
 
-    const [sql, data] =
+    const { query, values } =
       MySqlQueryGenerator.generateWhereClauseSql(whereExpression);
     // console.log("\nNested where clause: \n", sql);
 
-    expect(sql).toBe(
+    expect(query).toBe(
       "(`id` IN (SELECT `id` FROM `books` WHERE (`author` = ?)))"
     );
-    expect(data).toEqual(["John Doe"]);
+    expect(values).toEqual(["John Doe"]);
   });
 
   test("generate sql where clause for IN operator on array", () => {
@@ -145,20 +147,22 @@ describe("second set of tests", () => {
       },
     };
 
-    const [sql, data] =
+    const { query, values } =
       MySqlQueryGenerator.generateWhereClauseSql(whereExpression);
     // console.log("\nNested where clause: \n", sql);
     // console.log(data);
-    expect(sql).toBe("(`id` IN (?, ?, ?))");
-    expect(data).toEqual([1, 2, 3]);
+    expect(query).toBe("(`id` IN (?, ?, ?))");
+    expect(values).toEqual([1, 2, 3]);
 
-    const [selectSQL, selectData] =
-      MySqlQueryGenerator.generateSelectSql<IBook>("books_table", {
-        fieldsToSelect: ["author", "title"],
-        where: whereExpression,
-        limit: 100,
-        offset: 0,
-      });
+    // const {query:selectSQL, values:selectData} = MySqlQueryGenerator.generateSelectSql(
+    //   "books",
+    //   {
+    //     fieldsToSelect: ["author", "title"],
+    //     where: whereExpression,
+    //     limit: 100,
+    //     offset: 0,
+    //   }
+    // );
     // console.log(selectSQL);
     // console.log(selectData);
   });
@@ -170,18 +174,14 @@ describe("second set of tests", () => {
         value: "Sudha moorthy",
       },
     };
-    const [selectAuthor, data] = MySqlQueryGenerator.generateSelectSql<IBook>(
-      "books_table",
-      {
-        fieldsToSelect: ["author", "title"],
-        where: whereParam,
-        limit: 100,
-        offset: 0,
-      }
+    const { query, values } = MySqlQueryGenerator.generateSelectSql("Books", {
+      fieldsToSelect: ["author", "title"],
+      where: whereParam,
+      pagination: { limit: 100, offset: 0 },
+    });
+    expect(query).toEqual(
+      "SELECT `author`, `title` FROM `Books` WHERE (`author` LIKE ?) LIMIT ?"
     );
-    expect(selectAuthor).toEqual(
-      "SELECT `author`, `title` FROM `books_table` WHERE (`author` LIKE ?) LIMIT 100 OFFSET 0"
-    );
-    expect(data).toEqual(["%Sudha moorthy%"]);
+    expect(values).toEqual(["%Sudha moorthy%", 100]);
   });
 });

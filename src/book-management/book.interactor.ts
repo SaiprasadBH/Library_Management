@@ -1,56 +1,47 @@
 import { IInteractor } from "../core/interactor";
-import { clearScreen, readChar, readLine } from "../libs/input.utils";
+import { clearScreen, readLine } from "../libs/input.utils";
 import { BookRepository } from "./book.repository";
 import { IBook, IBookBase } from "../models/book.model";
 import {
-  enterButton,
-  printChoice,
+  printButton,
   printError,
   printHint,
-  printMenu,
-  printPanel,
   printResult,
-  printSubTitle,
-  printTitle,
 } from "../libs/output.utils";
-import { IPageRequest } from "../core/pagination";
+import { IPagedResponse, IPageRequest } from "../core/pagination";
 import { Menu } from "../libs/menu";
-import { Database } from "../database/db";
 import { ZodNumber, z } from "zod";
 import {
   BookSchema,
   BookSchemaBase,
   zNonNumString,
 } from "../models/book.schema";
-import { MySQLDatabase } from "../database/libraryDb";
-import { MySqlConnectionFactory } from "../database/dbConnection";
+import { MySQLConnectionFactory } from "../database/oldDbHandlingUtilities/connectionFactory";
+import { displayPage, loadPage } from "../libs/pagination.utils";
+import * as readline from "readline";
 
-const menu = new Menu([
-  { key: "1", label: "Add a Book" },
-  { key: "2", label: "Edit a Book" },
-  { key: "3", label: "Search for a Book" },
-  { key: "4", label: "Delete a Book" },
-  { key: "5", label: "Previous Menu" },
-]);
+const menu = new Menu(
+  [
+    { key: "1", label: "Add a Book" },
+    { key: "2", label: "Edit a Book" },
+    { key: "3", label: "Search for a Book" },
+    { key: "4", label: "Delete a Book" },
+    { key: "5", label: "Back" },
+  ],
+  "Book Management"
+);
 export class BookInteractor implements IInteractor {
   private repo: BookRepository;
 
-  constructor(connFactory: MySqlConnectionFactory) {
-    this.repo = new BookRepository(connFactory);
+  constructor(connection: MySQLConnectionFactory) {
+    this.repo = new BookRepository(connection);
   }
 
   async showMenu(): Promise<void> {
     let loop = true;
     while (loop) {
-      printTitle();
-      printSubTitle("Book Management");
-      printMenu();
-      const op = await readChar(menu.serialize());
-      clearScreen();
-      printTitle();
-      printSubTitle("Book Management");
-      const menuItem = menu.getItem(op);
-      printChoice(`${menuItem?.label}`);
+      const op = await menu.selectMenuItem();
+
       switch (op.toLowerCase()) {
         case "1":
           await addBook(this.repo);
@@ -69,11 +60,10 @@ export class BookInteractor implements IInteractor {
           break;
         default:
           printError("Invalid choice");
-          printHint(`Press ${enterButton} to continue`);
+          printHint(`Press ${printButton} to continue`);
           await readLine("");
           break;
       }
-      clearScreen();
     }
   }
 }
@@ -104,7 +94,7 @@ const setUserInputOrDefault = async <_, T>(
     ? await getNonEmptyInput(question)
     : (await readLine(`${question} (${existingData ?? ""}):`)) || existingData;
 };
-////////////////////////
+////////////////////
 
 async function validateInput<T>(
   question: string,
@@ -116,16 +106,14 @@ async function validateInput<T>(
       let newInput: string;
       if (existingValue) {
         newInput = await readLine(`${question} `, existingValue.toString());
-        return schema.parse(
-          schema instanceof ZodNumber ? Number(newInput) : newInput
-        );
-      }
-      newInput = await readLine(question);
+      } else newInput = await readLine(question);
+      menu.updateFrame(menu.selectedItem);
       return schema.parse(
         schema instanceof ZodNumber ? Number(newInput) : newInput
       );
     } catch (error) {
       if (error instanceof z.ZodError) {
+        menu.updateFrame(menu.selectedItem);
         printError(`Invalid input: ${error.errors[0].message}`);
       }
     }
@@ -178,7 +166,7 @@ async function getBookInput(existingBook?: IBookBase): Promise<IBookBase> {
     publisher,
     genre,
     isbnNo,
-    numOfPages,
+    numOfPages: numOfPages,
     totalNumOfCopies,
   };
 }
@@ -186,125 +174,62 @@ async function getBookInput(existingBook?: IBookBase): Promise<IBookBase> {
 async function addBook(repo: BookRepository) {
   try {
     const newBook: IBookBase = await getBookInput();
-    const createdBook: IBook = await repo.create(newBook);
+    const createdBook = await repo.create(newBook);
     if (createdBook) {
       printResult("Added the book successfully");
       displayPage(createdBook);
     }
   } catch (error: unknown) {
-    if (error instanceof Error) console.log(error.message);
+    if (error instanceof Error) {
+      printError(error.message);
+    }
   }
-  printHint(`Press ${enterButton} to continue`);
+  printHint(`Press ${printButton} to continue`);
   await readLine("");
   return;
 }
 
 async function editBook(repo: BookRepository) {
-  const bookId = await validateInput<number>(
-    "Enter the Id of the book to edit: ",
-    BookSchema.shape.id
-  );
-  const existingBook = await repo.getById(bookId);
   try {
-    if (!existingBook) {
-      printError("Book not found");
-    } else {
+    const bookId = await validateInput<number>(
+      "Enter the Id of the book to edit: ",
+      BookSchema.shape.id
+    );
+    const existingBook = await repo.getById(bookId);
+    if (existingBook) {
       printHint(
-        `Press ${enterButton} if you don't want to change the current property.\n`
+        `Press ${printButton} if you don't want to change the current property.\n`
       );
       const updatedData = await getBookInput(existingBook);
       const updatedBook = await repo.update(existingBook.id, updatedData);
-      printResult("Book updated successfully");
-      displayPage(updatedBook);
+      if (updatedBook) {
+        printResult("Book updated successfully");
+        displayPage(updatedBook);
+      }
     }
-  } catch (error) {
-    if (error instanceof Error) console.log(error.message);
+  } catch (err) {
+    if (err instanceof Error) printError(err.message);
+  } finally {
+    printHint(`Press ${printButton} to continue`);
+    await readLine("");
   }
-  printHint(`Press ${enterButton} to continue`);
-  await readLine("");
   return;
 }
 
-const displayPage = (items: IBook | IBook[]) => {
-  console.table(items);
-};
-
-function updatePage(key: string, page: IPageRequest, items: IBook[]) {
-  const total = items.length;
-  let limit = page.limit;
-
-  if (key === "\u001b[C") {
-    if (page.offset + limit < total) {
-      page.offset = page.offset + limit;
-    }
-  } else if (key === "\u001b[D") {
-    if (page.offset - limit >= 0) {
-      page.offset = page.offset - limit;
-    }
-  }
-  const updatedPageIndex = Math.floor(page.offset / page.limit) + 1;
-  const updatedPage = items.slice(page.offset, limit + page.offset);
-  return { updatedPage, updatedPageIndex };
-}
-
-const loadPage = async (
-  initialPage: IBook[],
-  pageRequest: IPageRequest,
-  searchResultItems: IBook[],
-  searchText?: string
-) => {
-  let loadedPage = initialPage;
-  let pageIndex = 1;
-  const totalPages = Math.ceil(searchResultItems.length / pageRequest.limit);
-  while (true) {
-    clearScreen();
-    printResult(
-      searchText
-        ? `Search result for "${searchText}"`
-        : "All current books in the Library"
-    );
-    displayPage(loadedPage);
-
-    const navPanel = `${pageIndex === 1 ? "" : "<"} ${pageIndex}/${totalPages} ${pageIndex === totalPages ? "" : ">"}`;
-    printPanel(`${navPanel}`);
-
-    printHint(`Press ${enterButton} to continue`);
-    const key = await readChar();
-    if (key === "\u001b[C" || key === "\u001b[D") {
-      const { updatedPage, updatedPageIndex } = updatePage(
-        key,
-        pageRequest,
-        searchResultItems
-      );
-      loadedPage = updatedPage;
-      pageIndex = updatedPageIndex;
-    } else if (key === "\r") break;
-  }
-};
-
 async function searchForBook(repo: BookRepository) {
   printHint(
-    `Press ${enterButton} on empty search field to show all the books.Default limit will be set to 5.`
+    `Press ${printButton} on empty search field to show all the books.Default limit will be set to 5.`
   );
   const searchText = await readLine("Search for title or ISBNo.: ");
   const offset = 0;
   const defaultLimit: number = 5;
-  printHint(`Press ${enterButton} to set default limit to 5`);
+  printHint(`Press ${printButton} to set default limit to 5`);
   const limit = await checkInt(
     await readLine("Enter limit: ", defaultLimit.toString())
   );
-  const pageRequest: IPageRequest = { offset, limit };
-  try {
-    const searchResultItems = await repo.list(searchText);
-    if (searchResultItems.length === 0) {
-      printError("No match found");
-    } else {
-      const currPage = searchResultItems.slice(offset, limit);
-      await loadPage(currPage, pageRequest, searchResultItems, searchText);
-    }
-  } catch (e) {
-    printError("No match found");
-  }
+  const pageRequest: IPageRequest = { search: searchText, offset, limit };
+
+  await loadPage(repo, pageRequest);
   return;
 }
 
@@ -314,14 +239,19 @@ async function deleteBook(repo: BookRepository) {
     BookSchema.shape.id
   );
 
-  const deletedBook = await repo.delete(bookId);
-  if (!deletedBook) printError("Book not found");
-  else {
-    printResult(
-      `The book ${deletedBook.title} with Id ${bookId} deleted successfully`
-    );
-    displayPage(deletedBook);
+  try {
+    const deletedBook = await repo.delete(bookId);
+    if (deletedBook) {
+      printResult(
+        `The book ${deletedBook.title} with Id ${bookId} deleted successfully`
+      );
+      displayPage(deletedBook);
+    }
+  } catch (err) {
+    if (err instanceof Error) printError(err.message);
+  } finally {
+    printHint(`Press ${printButton} to continue`);
+    await readLine("");
   }
-  await readLine("Press Enter to continue");
   return;
 }

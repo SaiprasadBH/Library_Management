@@ -1,200 +1,147 @@
 import { BookRepository } from "../book-management/book.repository";
 import { IRepository } from "../core/repository";
-import { MySqlConnectionFactory } from "../database/dbConnection";
 import { MemberRepository } from "../member-management/member.repository";
 import { ITransaction, ITransactionBase } from "../models/transaction.model";
 import { ITransactionBaseSchema } from "../models/transaction.schema";
-import { MySqlQueryGenerator } from "../libs/mysql-query-generator";
-import { QueryResult } from "mysql2";
-import mysql from "mysql2/promise";
-import { WhereExpression } from "../database/dbTypes";
 import { IBook } from "../models/book.schema";
+import { MySQLConnectionFactory } from "../database/oldDbHandlingUtilities/connectionFactory";
+import { ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import { getMysqlQuery } from "../libs/oldDbHandlingLibs/mysql-query-handler";
+import { WhereExpression } from "../database/oldDbHandlingUtilities/dbTypes";
+import { IPagedResponse, IPageRequest } from "../core/pagination";
 
 export class TransactionRepository
-  implements IRepository<ITransactionBase, ITransaction>
+  implements Omit<IRepository<ITransactionBase, ITransaction>, "update">
 {
-  private bookRepo: BookRepository;
-  private memberRepo: MemberRepository;
+  constructor(private readonly dbConnFactory: MySQLConnectionFactory) {}
+  private bookRepo: BookRepository = new BookRepository(this.dbConnFactory);
+  private memberRepo: MemberRepository = new MemberRepository(
+    this.dbConnFactory
+  );
 
-  constructor(private readonly dbConnectionFactory: MySqlConnectionFactory) {
-    this.bookRepo = new BookRepository(this.dbConnectionFactory);
-    this.memberRepo = new MemberRepository(this.dbConnectionFactory);
-  }
-
-  async create(data: ITransactionBase): Promise<ITransaction> {
+  async create(data: ITransactionBase): Promise<ITransaction | undefined> {
     const validatedData = ITransactionBaseSchema.parse(data);
-    const connection =
-      await this.dbConnectionFactory.acquireTransactionPoolConnection();
+    let book = await this.bookRepo.getById(validatedData.bookId);
+    if (!book || book.availableNumOfCopies <= 0) {
+      throw new Error("The book is not available or has no available copies.");
+    }
 
+    const updatedBook: IBook = {
+      ...book,
+      availableNumOfCopies: book.availableNumOfCopies - 1,
+    };
+
+    const newTransaction: Omit<ITransaction, "id"> = {
+      ...validatedData,
+      bookStatus: "issued",
+      dateOfIssue: new Date().toDateString(),
+      dueDate: new Date(
+        new Date().setDate(new Date().getDate() + 14)
+      ).toDateString(),
+    };
+    // Generation of queries:
+    const insertQuery = getMysqlQuery("insert", "Transactions", {
+      row: newTransaction,
+    })!;
+    const updateWhereClause = this.getByIdWhereClause(book.id);
+    const updateQuery = getMysqlQuery("update", "Books", {
+      row: updatedBook,
+      where: updateWhereClause as WhereExpression<IBook>,
+    })!;
+
+    // Execution of queries:
+    const poolTransaction =
+      await this.dbConnFactory.acquireTransactionPoolConnection();
     try {
-      const book = await this.bookRepo.getById(validatedData.bookId);
-
-      if (!book || book.availableNumOfCopies <= 0) {
-        throw new Error(
-          "The book is not available or has no available copies."
+      // const BookUpdated = await this.bookRepo.update(book.id, updatedBook);
+      const BookUpdated = (await poolTransaction.query<RowDataPacket[]>(
+        updateQuery.query,
+        updateQuery.values
+      )) as IBook[];
+      if (BookUpdated) {
+        const result = await poolTransaction.query<ResultSetHeader>(
+          insertQuery.query,
+          insertQuery.values
         );
+        if (!result) throw new Error("Transaction not created");
+        await poolTransaction.commit();
+        const createdTransaction = await this.getById(result.insertId);
+        return createdTransaction;
       }
-
-      const newTransaction: Omit<ITransaction, "id"> = {
-        ...validatedData,
-        bookStatus: "issued",
-        dateOfIssue: new Date().toDateString(),
-        dueDate: new Date(
-          new Date().setDate(new Date().getDate() + 14)
-        ).toDateString(),
-      };
-
-      await connection.initialize();
-
-      const [query, values] =
-        MySqlQueryGenerator.generateInsertSql<ITransaction>(
-          "transactions",
-          newTransaction
-        );
-
-      const result = (await connection.query<QueryResult>(
-        query,
-        values
-      )) as mysql.ResultSetHeader;
-
-      if (result.insertId) {
-        const updatedBook = await this.bookRepo.update(
-          book.id,
-          book,
-          book.availableNumOfCopies - 1
-        );
-
-        if (!updatedBook) {
-          throw new Error("Book update failed after issuing book.");
-        }
+    } catch (err) {
+      if (err instanceof Error) {
+        await poolTransaction.rollback();
+        throw new Error(err.message);
       }
-      await connection.commit();
-      const newTrxn = await this.getById(result.insertId);
-      return newTrxn;
-    } catch (e) {
-      await connection.rollback();
-      throw new Error((e as Error).message);
     } finally {
-      connection.release();
+      await poolTransaction.release();
     }
   }
 
-  async returnBook(id: number): Promise<ITransaction> {
-    const connection =
-      await this.dbConnectionFactory.acquireTransactionPoolConnection();
-
-    try {
-      const transaction = await this.getById(id);
-
-      if (!transaction) {
-        throw new Error(
-          "Transaction not found. Please enter correct transaction ID."
-        );
-      }
-
+  async delete(id: number): Promise<ITransaction | undefined> {
+    const transaction = await this.getById(id);
+    if (transaction) {
       if (transaction.bookStatus === "returned") {
         throw new Error("This book has already been returned.");
       }
 
-      const book = await this.bookRepo.getById(transaction.bookId);
-
+      let book = await this.bookRepo.getById(transaction.bookId);
       if (!book) {
         throw new Error("Book not found.");
       }
-
-      const updatedTransaction: ITransaction = {
-        ...transaction,
-        bookStatus: "returned",
+      const updatedBook: IBook = {
+        ...book,
+        availableNumOfCopies: book.availableNumOfCopies + 1,
       };
 
-      const whereCondition: WhereExpression<ITransaction> = {
-        id: {
-          op: "EQUALS",
-          value: id,
-        },
-      };
+      transaction.bookStatus = "returned";
 
-      const [query, values] =
-        MySqlQueryGenerator.generateUpdateSql<ITransaction>(
-          "transactions",
-          updatedTransaction,
-          whereCondition
+      // Generation of queries:
+      const updateWhereClause = this.getByIdWhereClause(id);
+      const updateQuery = getMysqlQuery("update", "Transactions", {
+        row: { bookStatus: transaction.bookStatus },
+        where: updateWhereClause,
+      })!;
+      const bookUpdateWhereClause = this.getByIdWhereClause(book.id);
+      const bookUpdateQuery = getMysqlQuery("update", "Books", {
+        row: updatedBook,
+        where: bookUpdateWhereClause as WhereExpression<IBook>,
+      })!;
+
+      // Execution of queries:
+      const poolTransaction =
+        await this.dbConnFactory.acquireTransactionPoolConnection();
+      try {
+        await poolTransaction.query(
+          bookUpdateQuery.query,
+          bookUpdateQuery.values
         );
-
-      const result = (await connection.query(
-        query,
-        values
-      )) as mysql.RowDataPacket;
-
-      if (result.affectedRows > 0) {
-        const updatedBook = await this.bookRepo.update(
-          book.id,
-          book,
-          book.availableNumOfCopies + 1
-        );
-
-        if (!updatedBook) {
-          throw new Error("Book update failed after returning book.");
+        await poolTransaction.query(updateQuery.query, updateQuery.values);
+        await poolTransaction.commit();
+        return transaction;
+      } catch (err) {
+        if (err instanceof Error) {
+          await poolTransaction.rollback();
+          throw new Error(err.message);
         }
+      } finally {
+        await poolTransaction.release();
       }
-      await connection.commit();
-      return updatedTransaction;
-    } catch (e) {
-      await connection.rollback();
-      throw new Error((e as Error).message);
-    } finally {
-      await connection.release();
-    }
-  }
-
-  async getById(id: number): Promise<ITransaction> {
-    const connection =
-      await this.dbConnectionFactory.acquireStandaloneConnection();
-
-    const whereCondition: WhereExpression<ITransaction> = {
-      id: {
-        op: "EQUALS",
-        value: id,
-      },
-    };
-    try {
-      await connection.initialize();
-      const [query, values] = MySqlQueryGenerator.generateSelectSql(
-        "transactions",
-        {
-          where: whereCondition,
-          limit: 1,
-        }
-      );
-
-      const result = (await connection.query<QueryResult>(
-        query,
-        values
-      )) as mysql.RowDataPacket;
-
-      if (result.length > 0) {
-        return result[0];
-      } else {
-        throw new Error(
-          "Transaction not found. Please enter correct transaction ID."
-        );
-      }
-    } catch (e) {
+    } else {
       throw new Error(
         "Transaction not found. Please enter correct transaction ID."
       );
-    } finally {
-      await connection.close();
     }
   }
 
-  async list(searchText?: string): Promise<ITransaction[]> {
-    const connection = await this.dbConnectionFactory.acquirePoolConnection();
-    let whereCondition: WhereExpression<ITransaction> | undefined;
-
-    if (searchText) {
-      const search = Number(searchText);
-      whereCondition = {
+  async list(
+    params: IPageRequest
+  ): Promise<IPagedResponse<ITransaction> | undefined> {
+    let filteredTransactions: ITransaction[];
+    let searchWhereClause: WhereExpression<ITransaction> | undefined;
+    if (params.search) {
+      const search = params.search.toLowerCase();
+      searchWhereClause = {
         OR: [
           {
             bookId: {
@@ -211,40 +158,80 @@ export class TransactionRepository
         ],
       };
     }
-
+    // Generation of queries:
+    const selectQuery = getMysqlQuery("select", "Transactions", {
+      where: searchWhereClause,
+      pagination: { offset: params.offset, limit: params.limit },
+    })!;
+    // Execution of queries:
+    const poolConnection =
+      await this.dbConnFactory.acquireTransactionPoolConnection();
     try {
-      await connection.initialize();
-      const [query, values] = MySqlQueryGenerator.generateSelectSql(
-        "transactions",
-        {
-          where: whereCondition,
-          limit: 5,
-          offset: 0,
-        }
-      );
-      const result = (await connection.query<QueryResult>(
-        query,
-        values
-      )) as mysql.RowDataPacket[];
-      if (result.length > 0) {
-        return result as ITransaction[];
-      } else {
-        throw new Error("Not a members found matching the criteria");
-      }
-    } catch (e) {
-      throw new Error(" No members found matching the criteria");
+      filteredTransactions = (await poolConnection.query(
+        selectQuery.query,
+        selectQuery.values
+      )) as ITransaction[];
+      if (filteredTransactions.length === 0)
+        throw new Error("No Transaction found matching the criteria");
+      const countQuery = getMysqlQuery("count", "Transactions", {
+        where: searchWhereClause,
+      })!;
+      const totalMatchedTransactions = (await poolConnection.query(
+        countQuery.query,
+        countQuery.values
+      )) as { count: number }[];
+      return {
+        items: filteredTransactions,
+        pagination: {
+          offset: params.offset,
+          limit: params.limit,
+          total: totalMatchedTransactions[0].count,
+        },
+      };
+    } catch (err) {
+      if (err instanceof Error) throw new Error(err.message);
     } finally {
-      await connection.release();
+      await poolConnection.release();
     }
   }
 
-  //////////////////////////////////////////
-  // Not Required
-  update(id: number, data: ITransactionBase): Promise<ITransaction | null> {
-    throw new Error("Method not implemented.");
+  // Helper functions
+
+  private getByIdWhereClause(
+    transactionId: number
+  ): WhereExpression<ITransaction> {
+    return {
+      id: {
+        op: "EQUALS",
+        value: transactionId,
+      },
+    };
   }
 
-  delete(id: number): Promise<ITransaction | null> {
-    throw new Error("Method not implemented.");
+  async getById(transactionId: number): Promise<ITransaction | undefined> {
+    // Generation of queries:
+    const selectWhereClause = this.getByIdWhereClause(transactionId);
+    const selectQuery = getMysqlQuery("select", "Transactions", {
+      where: selectWhereClause,
+    })!;
+    // Execution of queries:
+    const poolConnection = await this.dbConnFactory.acquirePoolConnection();
+    try {
+      const selectedTransaction = (
+        (await poolConnection.query(
+          selectQuery.query,
+          selectQuery.values
+        )) as ITransaction[]
+      )[0];
+      if (!selectedTransaction)
+        throw new Error(
+          "Transaction not found. Please enter correct transaction ID."
+        );
+      return selectedTransaction;
+    } catch (err) {
+      if (err instanceof Error) throw new Error(err.message);
+    } finally {
+      await poolConnection.release();
+    }
   }
 }

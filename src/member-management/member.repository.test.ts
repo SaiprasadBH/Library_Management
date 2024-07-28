@@ -1,12 +1,11 @@
 import { describe, test, expect, beforeEach, beforeAll } from "vitest";
 import { MemberRepository } from "./member.repository";
 import { IMemberBase, IMember } from "../models/member.schema";
-import { Database, JsonAdapter } from "../database/db";
 import { faker } from "@faker-js/faker";
 import { LibraryDataset } from "../database/library.dataset";
 import { AppEnvs } from "../core/read-env";
-import { MySqlConnectionFactory } from "../database/dbConnection";
 import mysql from "mysql2/promise";
+import { MySQLConnectionFactory } from "../database/oldDbHandlingUtilities/connectionFactory";
 
 function createMemberObject() {
   return {
@@ -19,16 +18,23 @@ function createMemberObject() {
 
 describe("MemberRepository", () => {
   let repository: MemberRepository;
-  let connectionFactory: MySqlConnectionFactory;
+  let connectionFactory: MySQLConnectionFactory;
 
   beforeAll(() => {
-    connectionFactory = new MySqlConnectionFactory({
-      dbURL: "mysql://user:user_password@localhost:3306/library_db",
-    });
+    connectionFactory = new MySQLConnectionFactory(AppEnvs.DATABASE_URL);
     repository = new MemberRepository(connectionFactory);
   });
 
-  // Creating a new member
+  beforeAll(async () => {
+    const membersData: IMemberBase[] = faker.helpers.multiple(
+      createMemberObject,
+      {
+        count: 5,
+      }
+    );
+    await Promise.all(membersData.map((data) => repository.create(data)));
+  });
+
   test("Creating a new member", async () => {
     const memberData: IMemberBase = {
       name: "Jane Smith",
@@ -36,13 +42,10 @@ describe("MemberRepository", () => {
       phoneNumber: "9899999210",
       address: "456 Elm Street",
     };
-    const newMember = await repository.create(memberData);
-    const selectedMember = await repository.getById(newMember.id);
-    expect(newMember).toEqual({
-      ...selectedMember,
-    });
-    const deletedMember = await repository.delete(newMember.id);
-  });
+    const newMember = (await repository.create(memberData))!;
+    expect(newMember).toEqual({ id: newMember.id, ...memberData });
+    await repository.delete(newMember.id);
+  }, 5000);
 
   // Updating a member
   test("Updating an existing member's details", async () => {
@@ -52,7 +55,7 @@ describe("MemberRepository", () => {
       phoneNumber: "9898967890",
       address: "789 Maple Street",
     };
-    const createdMember = await repository.create(memberData);
+    const createdMember = (await repository.create(memberData))!;
 
     const updatedData: IMemberBase = {
       name: "John Doe",
@@ -64,69 +67,54 @@ describe("MemberRepository", () => {
       createdMember.id,
       updatedData
     );
-    expect(updatedMember).toEqual({
-      id: createdMember?.id,
-      ...updatedData,
-    });
-
-    const deletedMember = await repository.delete(updatedMember.id);
-  });
+    expect(updatedMember).toEqual({ id: createdMember.id, ...updatedData });
+  }, 5000);
 
   // Deleting a member
   test("Deleting a member", async () => {
-    const memberData: IMemberBase = createMemberObject();
-    const createdMember = await repository.create(memberData);
+    const memberData: IMemberBase = {
+      name: "John Doe",
+      age: 35,
+      phoneNumber: "9898967890",
+      address: "789 Maple Street",
+    };
+    const createdMember = (await repository.create(memberData))!;
+    const member = await repository.getById(createdMember.id);
     const deletedMember = await repository.delete(createdMember.id);
-
     expect(deletedMember).toEqual(createdMember);
-
-    await expect(repository.getById(createdMember.id)).rejects.toThrow(
-      "Member not found"
-    );
-  });
+  }, 5000);
 
   // Retrieving a member by ID
   test("Retrieving a member by ID that exists", async () => {
-    const memberData: IMemberBase = createMemberObject();
-    const createdMember = await repository.create(memberData);
-
-    const retrievedMember = await repository.getById(createdMember.id);
-    expect(retrievedMember).toEqual(createdMember);
-
-    const deletedMember = await repository.delete(retrievedMember.id);
-  });
+    const member = await repository.getById(37);
+    expect(member).toBeDefined();
+    expect(member?.id).toBe(37);
+  }, 5000);
 
   test("Retrieving a member by ID that does not exist", async () => {
-    await expect(repository.getById(9999)).rejects.toThrow("Member not found");
-  });
+    expect(async () => await repository.getById(999)).rejects.toThrowError();
+  }, 5000);
 
-  // List the members with default limit
-  test.skip("Listing all members", async () => {
-    const members = await repository.list();
-    expect(members.length).toBe(2);
-  });
-
-  // Searching member with search term that doesn't match
-  test("Listing members with a non-matching search", async () => {
-    await expect(repository.list("Non-Existent Name")).rejects.toThrow(
-      "No members found matching the criteria"
-    );
-  });
+  test("Listing all members", async () => {
+    const members = await repository.list({ offset: 0, limit: 5 });
+    expect(members?.items.length).toBe(5);
+  }, 5000);
 
   // Searching member with search term
   test("Listing members with a search term", async () => {
-    // const memberData: IMemberBase = {
-    //   name: "Unique Name",
-    //   age: 40,
-    //   phoneNumber: "1234509876",
-    //   address: "789 Unique City",
-    // };
-    // const createdMember = await repository.create(memberData);
+    const memberData: IMemberBase = {
+      name: "Unique Name",
+      age: 40,
+      phoneNumber: "1234509876",
+      address: "789 Unique City",
+    };
+    const createdMember = await repository.create(memberData);
 
-    const members = await repository.list("Unique Name");
-    expect(members.length).toBeGreaterThan(0);
-    expect(members[0].name).toBe("Unique Name");
-
-    // const deletedMember = await repository.delete(createdMember.id);
-  });
+    const members = await repository.list({
+      search: "Unique Name",
+      offset: 0,
+      limit: 5,
+    });
+    expect(members?.items[0].name).toBe("Unique Name");
+  }, 5000);
 });

@@ -1,15 +1,19 @@
 import chalk from "chalk";
 
 export function printTitle() {
-  console.log(chalk.bgGreenBright.bold(" Library Management "));
+  return chalk.bgGreenBright.bold(" Library Management ");
 }
 
 export function printSubTitle(subTitle: string) {
-  console.log(chalk.bgCyan.bold(`\n ${subTitle} `));
+  return chalk.bgCyan.bold(` ${subTitle} `);
 }
 
 export function printChoice(choice: string) {
-  console.log(chalk.bgBlueBright.bold(`\n ${choice} \n`));
+  return chalk.bgBlueBright.bold(` ${choice} `);
+}
+
+export function printExit(str: string) {
+  return chalk.bgRed.bold(` ${str} `);
 }
 
 export function printMenu() {
@@ -40,6 +44,4 @@ export function printPanel(panelTemplate: string) {
   console.log(...formatedPanelItems);
 }
 
-export const rArrowButton = chalk.bgGreen(" > ");
-export const lArrowButton = chalk.bgGreen(" < ");
-export const enterButton = chalk.bgGreen.bold(" Enter ");
+export const printButton = chalk.bgGreen.bold(" Enter ");

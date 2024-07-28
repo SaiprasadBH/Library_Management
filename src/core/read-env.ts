@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { configDotenv } from "dotenv";
 
 configDotenv();
