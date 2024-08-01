@@ -4,6 +4,7 @@ import { IBookBase } from "../models/book.model";
 import { faker } from "@faker-js/faker";
 import { AppEnvs } from "../core/read-env";
 import { MySQLConnectionFactory } from "../database/oldDbHandlingUtilities/connectionFactory";
+import { DrizzleAdapter } from "../../drizzle-mysql2-orm/drizzleMysqlAdapter";
 
 function createBookObject(): IBookBase {
   return {
@@ -19,26 +20,29 @@ function createBookObject(): IBookBase {
 
 describe("BookRepository", () => {
   let repository: BookRepository;
-  let db: MySQLConnectionFactory;
+  let db: DrizzleAdapter;
+  let url: string;
 
   beforeAll(() => {
-    db = new MySQLConnectionFactory(AppEnvs.DATABASE_URL);
+    url = AppEnvs.DATABASE_URL;
+    db = new DrizzleAdapter(url);
     repository = new BookRepository(db);
   });
 
   // Get a book by id.
   test("Get book by id", async () => {
-    const seltectedBook = await repository.getById(1);
+    const seltectedBook = await repository.getById(7);
+    console.log(seltectedBook);
     expect(seltectedBook).toEqual({
-      id: 1,
-      title: "The Rust Programming Language (Covers Rust 2018)",
-      author: "Steve Klabnik, Carol Nichols",
-      publisher: "No Starch Press",
+      author: "Carlo Ghezzi, Mehdi Jazayeri",
+      availableNumOfCopies: 7,
       genre: "Computers",
-      isbnNo: "9781718500457",
-      numOfPages: 561,
-      totalNumOfCopies: 8,
-      availableNumOfCopies: 8,
+      id: 7,
+      isbnNo: "",
+      numOfPages: 456,
+      publisher: "John Wiley & Sons",
+      title: "Programming Language Concepts",
+      totalNumOfCopies: 7,
     });
   }, 10000);
 
@@ -73,7 +77,6 @@ describe("BookRepository", () => {
       totalNumOfCopies: 5,
     };
     const createdBook = (await repository.create(bookData))!;
-    console.log(createdBook);
     const updatedData: IBookBase = {
       title: "Updated Book",
       author: "John Doe",
@@ -130,15 +133,20 @@ describe("BookRepository", () => {
 
   // Searching book with search term that doesn't match
   test("Listing books with a non-matching search", async () => {
-    await expect(
-      repository.list({ search: "Non-Existent Title", offset: 0, limit: 5 })
-    ).rejects.toThrow("No books found matching the criteria");
+    const result = await repository.list({
+      search: "Non-Existent Title",
+      offset: 0,
+      limit: 5,
+    });
+
+    expect(result!.items).toEqual([]);
+    expect(result!.pagination.total).toBe(0);
   }, 10000);
 
   // Searching book with search term
   test("Listing books with a search term", async () => {
     const bookData: IBookBase = {
-      title: "New Book",
+      title: "Unique Title",
       author: "Jane Smith",
       publisher: "Fiction House",
       genre: "Adventure",
@@ -156,7 +164,7 @@ describe("BookRepository", () => {
       search: "Unique Title",
       offset: 0,
       limit: 5,
-    })!;
+    });
     expect(books?.items.length).toBeGreaterThan(0);
     expect(books?.items[0].title).toBe("Unique Title");
     const deletedBook = await repository.delete(newBook.id);

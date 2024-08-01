@@ -7,3 +7,4 @@ database-files
 oldDbHandlingLibs/
 oldDbHandlingUtilities/
 drizzle-mysql2-orm/migration/
+server

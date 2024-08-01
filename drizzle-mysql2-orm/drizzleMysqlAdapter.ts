@@ -10,7 +10,7 @@ export interface IDrizzleAdapter {
   getPoolConnection: () => Promise<MySql2Database<Record<string, unknown>>>;
 }
 
-class DrizzleAdapter implements IDrizzleAdapter {
+export class DrizzleAdapter implements IDrizzleAdapter {
   private standaloneConnection: ReturnType<typeof drizzle> | undefined;
   private poolConnection: ReturnType<typeof drizzle> | undefined;
   private dbUrl: string | undefined;

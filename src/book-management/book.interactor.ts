@@ -19,6 +19,7 @@ import {
 import { MySQLConnectionFactory } from "../database/oldDbHandlingUtilities/connectionFactory";
 import { displayPage, loadPage } from "../libs/pagination.utils";
 import * as readline from "readline";
+import { DrizzleAdapter } from "../../drizzle-mysql2-orm/drizzleMysqlAdapter";
 
 const menu = new Menu(
   [
@@ -33,7 +34,7 @@ const menu = new Menu(
 export class BookInteractor implements IInteractor {
   private repo: BookRepository;
 
-  constructor(connection: MySQLConnectionFactory) {
+  constructor(connection: DrizzleAdapter) {
     this.repo = new BookRepository(connection);
   }
 

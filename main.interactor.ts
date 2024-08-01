@@ -12,6 +12,7 @@ import { MySQLConnectionFactory } from "./src/database/oldDbHandlingUtilities/co
 import { AppEnvs } from "./src/core/read-env";
 import { MemberInteractor } from "./src/member-management/member.interaction";
 import { TransactionInteractor } from "./src/transaction-management/transaction.interaction";
+import { DrizzleAdapter } from "./drizzle-mysql2-orm/drizzleMysqlAdapter";
 
 const menu = new Menu([
   { key: "1", label: "Book Management" },
@@ -22,13 +23,13 @@ const menu = new Menu([
 
 export class LibraryInteractor implements IInteractor {
   private readonly bookInteractor: BookInteractor;
-  private readonly memberInteractor: MemberInteractor;
-  private readonly transactionInteractor: TransactionInteractor;
+  // private readonly memberInteractor: MemberInteractor;
+  //private readonly transactionInteractor: TransactionInteractor;
 
-  constructor(private readonly connFactory: MySQLConnectionFactory) {
+  constructor(private readonly connFactory: DrizzleAdapter) {
     this.bookInteractor = new BookInteractor(connFactory);
-    this.memberInteractor = new MemberInteractor(connFactory);
-    this.transactionInteractor = new TransactionInteractor(connFactory);
+    // this.memberInteractor = new MemberInteractor(connFactory);
+    //this.transactionInteractor = new TransactionInteractor(connFactory);
   }
 
   async showMenu(): Promise<void> {
@@ -39,14 +40,14 @@ export class LibraryInteractor implements IInteractor {
         break;
       case "2":
         clearScreen();
-        await this.memberInteractor.showMenu();
+        //await this.memberInteractor.showMenu();
         break;
       case "3":
         clearScreen();
-        await this.transactionInteractor.showMenu();
+        //  await this.transactionInteractor.showMenu();
         break;
       case "4":
-        await this.connFactory.endConnection();
+        // await this.connFactory.endConnection();
         menu.updateFrame();
         console.log("\n");
         printPanel("! ! ! Bye ! ! !");
@@ -63,7 +64,7 @@ export class LibraryInteractor implements IInteractor {
 }
 
 // Initialize the database and pass it to LibraryInteractor
-const connFactory = new MySQLConnectionFactory(AppEnvs.DATABASE_URL);
+const connFactory = new DrizzleAdapter(AppEnvs.DATABASE_URL);
 const libManager = new LibraryInteractor(connFactory);
 
 libManager.showMenu();
