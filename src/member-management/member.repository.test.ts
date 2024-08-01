@@ -6,6 +6,7 @@ import { LibraryDataset } from "../database/library.dataset";
 import { AppEnvs } from "../core/read-env";
 import mysql from "mysql2/promise";
 import { MySQLConnectionFactory } from "../database/oldDbHandlingUtilities/connectionFactory";
+import { DrizzleAdapter } from "../../drizzle-mysql2-orm/drizzleMysqlAdapter";
 
 function createMemberObject() {
   return {
@@ -18,10 +19,10 @@ function createMemberObject() {
 
 describe("MemberRepository", () => {
   let repository: MemberRepository;
-  let connectionFactory: MySQLConnectionFactory;
+  let connectionFactory: DrizzleAdapter;
 
   beforeAll(() => {
-    connectionFactory = new MySQLConnectionFactory(AppEnvs.DATABASE_URL);
+    connectionFactory = new DrizzleAdapter(AppEnvs.DATABASE_URL);
     repository = new MemberRepository(connectionFactory);
   });
 
@@ -86,9 +87,9 @@ describe("MemberRepository", () => {
 
   // Retrieving a member by ID
   test("Retrieving a member by ID that exists", async () => {
-    const member = await repository.getById(37);
+    const member = await repository.getById(1);
     expect(member).toBeDefined();
-    expect(member?.id).toBe(37);
+    expect(member?.id).toBe(1);
   }, 5000);
 
   test("Retrieving a member by ID that does not exist", async () => {

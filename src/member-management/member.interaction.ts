@@ -14,6 +14,7 @@ import { ZodNumber, z } from "zod";
 import { MySQLConnectionFactory } from "../database/oldDbHandlingUtilities/connectionFactory";
 import { LibraryDataset } from "../database/library.dataset";
 import { displayPage, loadPage } from "../libs/pagination.utils";
+import { DrizzleAdapter } from "../../drizzle-mysql2-orm/drizzleMysqlAdapter";
 
 const menu = new Menu(
   [
@@ -28,7 +29,7 @@ const menu = new Menu(
 export class MemberInteractor implements IInteractor {
   private repo: MemberRepository;
 
-  constructor(private readonly dbConnFactory: MySQLConnectionFactory) {
+  constructor(private readonly dbConnFactory: DrizzleAdapter) {
     this.repo = new MemberRepository(this.dbConnFactory);
   }
 

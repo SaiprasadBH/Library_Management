@@ -23,12 +23,12 @@ const menu = new Menu([
 
 export class LibraryInteractor implements IInteractor {
   private readonly bookInteractor: BookInteractor;
-  // private readonly memberInteractor: MemberInteractor;
+  private readonly memberInteractor: MemberInteractor;
   //private readonly transactionInteractor: TransactionInteractor;
 
   constructor(private readonly connFactory: DrizzleAdapter) {
     this.bookInteractor = new BookInteractor(connFactory);
-    // this.memberInteractor = new MemberInteractor(connFactory);
+    this.memberInteractor = new MemberInteractor(connFactory);
     //this.transactionInteractor = new TransactionInteractor(connFactory);
   }
 
@@ -40,7 +40,7 @@ export class LibraryInteractor implements IInteractor {
         break;
       case "2":
         clearScreen();
-        //await this.memberInteractor.showMenu();
+        await this.memberInteractor.showMenu();
         break;
       case "3":
         clearScreen();
