@@ -201,7 +201,7 @@ async function searchForMember(repo: MemberRepository) {
   const limit = await checkInt(
     await readLine("Enter limit: ", defaultLimit.toString())
   );
-  const pageRequest: IPageRequest = { offset, limit };
+  const pageRequest: IPageRequest = { search: searchText, offset, limit };
 
   await loadPage(repo, pageRequest);
   return;
