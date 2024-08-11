@@ -5,11 +5,12 @@ import { IPageRequest, IPagedResponse } from "../core/pagination";
 import {
   drizzleAdapter,
   books,
+  IDrizzleAdapter,
 } from "../../drizzle-mysql2-orm/drizzleMysqlAdapter";
 import { eq, like, sql } from "drizzle-orm";
 
 export class BookRepository implements IRepository<IBookBase, IBook> {
-  constructor(private readonly dbConnFactory: typeof drizzleAdapter) {}
+  constructor(private readonly dbConnFactory: IDrizzleAdapter) {}
 
   async create(newBookdata: IBookBase): Promise<IBook | undefined> {
     let validatedData: Partial<IBook> = BookSchemaBase.parse(newBookdata);
