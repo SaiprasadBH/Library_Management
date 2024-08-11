@@ -44,18 +44,20 @@ export class TransactionRepository
 
     const db = await this.dbConnFactory.getPoolConnection();
     try {
-      const createdTransaction = await db.transaction(async (tx) => {
-        const [result] = await tx
-          .select()
-          .from(transactions)
-          .where(eq(transactions.bookId, validatedData.bookId));
-        return result;
-        await tx.insert(transactions).values(newTransaction);
-        await tx
-          .update(books)
-          .set({ availableNumOfCopies: updatedBook.availableNumOfCopies })
-          .where(eq(books.id, validatedData.bookId));
-      });
+      const createdTransaction: ITransaction = await db.transaction(
+        async (tx) => {
+          const [result] = await tx
+            .select()
+            .from(transactions)
+            .where(eq(transactions.bookId, validatedData.bookId));
+          return result as ITransaction;
+          await tx.insert(transactions).values(newTransaction);
+          await tx
+            .update(books)
+            .set({ availableNumOfCopies: updatedBook.availableNumOfCopies })
+            .where(eq(books.id, validatedData.bookId));
+        }
+      );
 
       return createdTransaction;
     } catch (err) {
@@ -117,7 +119,7 @@ export class TransactionRepository
         "Transaction not found. Please enter correct transaction ID."
       );
     }
-    return selectedTransaction;
+    return selectedTransaction as ITransaction;
   }
 
   async list(
