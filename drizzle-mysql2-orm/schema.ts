@@ -41,3 +41,10 @@ export const transactions = mysqlTable("transactions", {
   dateOfIssue: varchar("dateOfIssue", { length: 15 }).notNull(),
   dueDate: varchar("dueDate", { length: 15 }).notNull(),
 });
+
+export const users = mysqlTable("users", {
+  id: serial("id").primaryKey().notNull(), // Auto-incremented primary key
+  userName: varchar("userName", { length: 255 }).notNull(), // Username column with a maximum length of 255 characters
+  password: varchar("password", { length: 255 }).notNull(), // Hashed password column
+  role: varchar("role", { length: 10 }).notNull(), // Role column with a max length of 10 characters (admin, librarian, user)
+});

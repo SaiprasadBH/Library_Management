@@ -7,3 +7,10 @@ export interface IMemberBase {
 export interface IMember extends IMemberBase {
   id: number;
 }
+
+export interface IUser {
+  id: number;
+  userName: string;
+  password: string; // hashed password
+  role: "admin" | "librarian" | "user";
+}
