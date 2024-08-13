@@ -18,6 +18,7 @@ import { IUser } from "../../src/models/member.model";
 import { IDrizzleAdapter } from "../../drizzle-mysql2-orm/drizzleMysqlAdapter";
 import { users } from "../../drizzle-mysql2-orm/schema";
 import { eq } from "drizzle-orm";
+import cookieParser from "cookie-parser";
 
 declare global {
   namespace Express {
@@ -26,12 +27,17 @@ declare global {
     }
   }
 }
+const accessTokenSecret =
+  process.env.ACCESS_TOKEN_SECRET || "some_default_token";
+const refreshTokenSecret =
+  process.env.REFRESH_TOKEN_SECRET || "some_default_token";
 
 config();
 
 const db = drizzleAdapter.getPoolConnection();
 const app = express();
 app.use(express.json());
+app.use(cookieParser());
 
 // Registration Route
 app.post("/register", async (req, res) => {
@@ -71,7 +77,12 @@ app.post("/login", async (req, res) => {
     const accessToken = generateAccessToken(user[0] as IUser);
     const refreshToken = generateRefreshToken(user[0] as IUser);
 
-    res.json({ accessToken, refreshToken });
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production", // use secure cookies in production
+      sameSite: "strict",
+    });
+    res.json({ accessToken });
   } catch (err) {
     res.status(400).end((err as Error).message);
   }
@@ -88,12 +99,7 @@ export const authenticateJWT = (
   res: Response,
   next: NextFunction
 ) => {
-  const accessTokenSecret =
-    process.env.ACCESS_TOKEN_SECRET || "some_default_token";
-  const refreshTokenSecret =
-    process.env.REFRESH_TOKEN_SECRET || "some_default_token";
   const authHeader = req.headers.authorization;
-
   if (authHeader) {
     const token = authHeader.split(" ")[1];
     jwt.verify(token, accessTokenSecret, (err, user) => {
@@ -183,3 +189,29 @@ app.delete(
     }
   }
 );
+
+app.post("/token", async (req, res) => {
+  const refreshToken = req.cookies.refreshToken;
+
+  if (!refreshToken) {
+    return res.sendStatus(401);
+  }
+
+  try {
+    const user = jwt.verify(refreshToken, refreshTokenSecret) as JwtPayload;
+    const newAccessToken = generateAccessToken(user as IUser);
+    res.json({ accessToken: newAccessToken });
+  } catch (err) {
+    res.sendStatus(403);
+  }
+});
+
+app.post("/logout", (req, res) => {
+  res.clearCookie("refreshToken");
+  res.status(200).json({ message: "Logged out successfully" });
+});
+
+app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+  console.error(err.stack);
+  res.status(500).json({ message: err.message });
+});
