@@ -47,4 +47,5 @@ export const users = mysqlTable("users", {
   userName: varchar("userName", { length: 255 }).notNull(), // Username column with a maximum length of 255 characters
   password: varchar("password", { length: 255 }).notNull(), // Hashed password column
   role: varchar("role", { length: 10 }).notNull(), // Role column with a max length of 10 characters (admin, librarian, user)
+  refresh_token: varchar("refresh_token", { length: 255 }),
 });

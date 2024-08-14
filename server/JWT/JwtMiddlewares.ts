@@ -1,5 +1,5 @@
 import express, { Request, Response, NextFunction } from "express";
-import jwt, { JwtPayload } from "jsonwebtoken";
+import jwt from "jsonwebtoken";
 import "dotenv/config";
 import { config } from "dotenv";
 import { BookRepository } from "../../src/book-management/book.repository";
@@ -23,21 +23,49 @@ import cookieParser from "cookie-parser";
 declare global {
   namespace Express {
     interface Request {
-      user?: any;
+      user?: IUser;
     }
   }
 }
-const accessTokenSecret =
-  process.env.ACCESS_TOKEN_SECRET || "some_default_token";
-const refreshTokenSecret =
-  process.env.REFRESH_TOKEN_SECRET || "some_default_token";
 
 config();
+
+const accessTokenSecret = process.env.ACCESS_TOKEN_SECRET!;
+const refreshTokenSecret = process.env.REFRESH_TOKEN_SECRET!;
 
 const db = drizzleAdapter.getPoolConnection();
 const app = express();
 app.use(express.json());
 app.use(cookieParser());
+
+// Utility function to get user by userName
+const getUserById = async (userId: number) => {
+  const user = await (await db)
+    .select()
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  return user[0];
+};
+
+const getUserByUsername = async (userName: string) => {
+  const user = await (await db)
+    .select()
+    .from(users)
+    .where(eq(users.userName, userName))
+    .limit(1);
+  return user[0];
+};
+
+// Utility function to get user by refresh token
+const getUserByRefreshToken = async (refreshToken: string) => {
+  const user = await (await db)
+    .select()
+    .from(users)
+    .where(eq(users.refresh_token, refreshToken))
+    .limit(1);
+  return user[0];
+};
 
 // Registration Route
 app.post("/register", async (req, res) => {
@@ -54,7 +82,7 @@ app.post("/register", async (req, res) => {
     await (await db).insert(users).values(newUser); // Insert new user into the database
     res.status(201).json({ message: "User registered successfully" });
   } catch (err) {
-    res.status(400).end((err as Error).message);
+    res.status(400).json({ error: (err as Error).message });
   }
 });
 
@@ -63,42 +91,34 @@ app.post("/login", async (req, res) => {
   try {
     const { userName, password } = req.body;
 
-    const user = await (await db)
-      .select()
-      .from(users)
-      .where(eq(users.userName, userName));
-    // Retrieve user by userName
+    const user = await getUserByUsername(userName);
     if (!user) return res.status(400).json({ message: "User not found" });
 
-    const isPasswordValid = await comparePassword(password, user[0].password);
+    const isPasswordValid = await comparePassword(password, user.password);
     if (!isPasswordValid)
       return res.status(401).json({ message: "Invalid credentials" });
 
-    const accessToken = generateAccessToken(user[0] as IUser);
-    const refreshToken = generateRefreshToken(user[0] as IUser);
+    const accessToken = generateAccessToken(user as IUser);
+    const refreshToken = generateRefreshToken(user as IUser);
 
-    res.cookie("refreshToken", refreshToken, {
+    await (await db)
+      .update(users)
+      .set({ refresh_token: refreshToken })
+      .where(eq(users.id, user.id));
+
+    res.cookie(`refreshToken_${user.id}`, refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production", // use secure cookies in production
+      secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
     });
     res.json({ accessToken });
   } catch (err) {
-    res.status(400).end((err as Error).message);
+    res.status(400).json({ error: (err as Error).message });
   }
 });
 
-const port = 3000;
-app.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}/`);
-});
-
-const bookRepository = new BookRepository(drizzleAdapter);
-export const authenticateJWT = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+// JWT Authentication Middleware
+const authenticateJWT = (req: Request, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
   if (authHeader) {
     const token = authHeader.split(" ")[1];
@@ -106,7 +126,7 @@ export const authenticateJWT = (
       if (err) {
         return res.sendStatus(403);
       }
-      req.user = user; // Store user info in the request object
+      req.user = user as IUser;
       next();
     });
   } else {
@@ -114,15 +134,19 @@ export const authenticateJWT = (
   }
 };
 
-export const authorizeRoles = (...roles: string[]) => {
+// Authorization Middleware
+const authorizeRoles = (...roles: string[]) => {
   return (req: Request, res: Response, next: NextFunction) => {
-    if (roles.includes(req.user.role)) {
+    if (req.user && roles.includes(req.user.role)) {
       next();
     } else {
-      res.sendStatus(403); // Forbidden
+      res.sendStatus(403);
     }
   };
 };
+
+// Book Management Routes
+const bookRepository = new BookRepository(drizzleAdapter);
 
 app.get("/books", authenticateJWT, async (req, res) => {
   try {
@@ -190,28 +214,89 @@ app.delete(
   }
 );
 
-app.post("/token", async (req, res) => {
-  const refreshToken = req.cookies.refreshToken;
+// Token Refresh Route
+app.post("/refresh", authenticateJWT, async (req, res) => {
+  const userId = req.user?.id;
+  const refreshToken = req.cookies[`refreshToken_${userId}`];
+  console.log(refreshToken);
 
   if (!refreshToken) {
-    return res.sendStatus(401);
+    return res.sendStatus(401); // Unauthorized
   }
 
   try {
-    const user = jwt.verify(refreshToken, refreshTokenSecret) as JwtPayload;
-    const newAccessToken = generateAccessToken(user as IUser);
-    res.json({ accessToken: newAccessToken });
+    const user = await getUserById(userId!);
+
+    if (!user || user.refresh_token !== refreshToken) {
+      return res.sendStatus(403); // Forbidden
+    }
+
+    jwt.verify(refreshToken as string, refreshTokenSecret, (err) => {
+      if (err) return res.sendStatus(403); // Forbidden
+
+      const newAccessToken = generateAccessToken(user as IUser);
+      res.json({ accessToken: newAccessToken });
+    });
   } catch (err) {
-    res.sendStatus(403);
+    res.sendStatus(500); // Internal Server Error
   }
 });
 
-app.post("/logout", (req, res) => {
-  res.clearCookie("refreshToken");
-  res.status(200).json({ message: "Logged out successfully" });
+// Logout Route
+app.post("/logout", authenticateJWT, async (req, res) => {
+  try {
+    const userId = req.user?.id;
+
+    const user = await getUserById(userId!);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    await (await db)
+      .update(users)
+      .set({ refresh_token: null })
+      .where(eq(users.id, user.id));
+
+    res.clearCookie(`refreshToken_${user.id}`);
+    res.status(200).json({ message: "Logged out successfully" });
+  } catch (err) {
+    res.status(500).json({ message: (err as Error).message });
+  }
 });
 
+// Forced Logout Route
+app.post("/forced-logout", async (req, res) => {
+  try {
+    const { userName } = req.body;
+
+    if (!userName) {
+      return res
+        .status(400)
+        .json({ message: "missing userName in request Body" });
+    }
+
+    const user = await getUserByUsername(userName);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    await (await db)
+      .update(users)
+      .set({ refresh_token: null })
+      .where(eq(users.id, user.id));
+
+    res.clearCookie("refreshToken");
+    res.status(200).json({ message: `User ${userName} logged out forcefully` });
+  } catch (err) {
+    res.status(500).json({ message: (err as Error).message });
+  }
+});
+
+// Global Error Handler
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   console.error(err.stack);
   res.status(500).json({ message: err.message });
+});
+
+const port = 3000;
+app.listen(port, () => {
+  console.log(`Server running at http://localhost:${port}/`);
 });
